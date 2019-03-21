@@ -27,8 +27,8 @@ if __name__ == "__main__":
     parser.add_argument('-tp', type=str, default='auto',
                         help='auto or cross correlation.')
 
-    parser.add_argument('-lmm', type=int, nargs='+',
-                        default=[2, 600], help='lmin and lmax')
+#    parser.add_argument('-lmm', type=int, nargs='+',
+#                        default=[2, 600], help='lmin and lmax')
     parser.add_argument('-nlb', type=int, default=1,
                         help='Number of ells per bin.')
 
@@ -44,24 +44,33 @@ def ini_field(mask, maps):
     return fld
 
 
-def ini_bin(nside, nlb, lmax):
+def ini_bin(nside, nlb):
     '''Initialize the set of bins.'''
-    b = nmt.NmtBin(nside, nlb=nlb, lmax=lmax)
+    b = nmt.NmtBin(nside, nlb=nlb)
     return b
 
 
 def est_cl(fld1, fld2, b):
     '''Estimate Cl.'''
+    print('>> Estimating Cl...')
+
     # NmtWorkspace object used to compute and store the mode coupling matrix,
     # which only depends on the masks, not on the maps
     w = nmt.NmtWorkspace()
+    print('>> Computing coupling matrix...')
     w.compute_coupling_matrix(fld1, fld2, b)
+
     # compute the coupled full-sky angular power spectra
     # this is equivalent to Healpy.anafast on masked maps
+    print('>> Computing coupled Cl...')
     cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+
     # decouple into bandpowers by inverting the binned coupling matrix
-    cl_decoupled = w.decouple_cell(cl_coupled)
+    print('>> Decoupling Cl...')
+    cl_decoupled = w.decouple_cell(cl_coupled)[0]
+
     # get the effective ells
+    print('>> Getting ')
     ell = b.get_effective_ells()
 
     return ell, cl_decoupled
@@ -94,7 +103,7 @@ if __name__ == "__main__":
     else:
         sys.exit('>> Wrong correlation type!')
 
-    b = ini_bin(args.nside, args.nlb, args.lmm[1])
+    b = ini_bin(args.nside, args.nlb)
 
     ell, cl = est_cl(field1, field2, b)
 
