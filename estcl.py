@@ -35,6 +35,8 @@ if __name__ == "__main__":
                         help='Data file which specifies the bins. \
                             Two columns [lmin, lmax], closed on both sides.')
 
+    parser.add_argument('-savewsp', type=int, default=0,
+                        help='Save the workspace or not, which might be very large.')
     parser.add_argument('-fwsp', type=str, default='',
                         help='Workspace file name.')
 
@@ -74,7 +76,7 @@ def ini_bin(nside, fb):
     return b
 
 
-def est_cl(fld1, fld2, b, fwsp, me='full'):
+def est_cl(fld1, fld2, b, fwsp, swsp, me='full'):
     '''Estimate Cl.'''
     # NmtWorkspace object used to compute and store the mode coupling matrix,
     # which only depends on the masks, not on the maps
@@ -85,7 +87,7 @@ def est_cl(fld1, fld2, b, fwsp, me='full'):
     else:
         print('>> Computing coupling matrix...')
         w.compute_coupling_matrix(fld1, fld2, b)
-        if fwsp != '':
+        if fwsp != '' and swsp:
             w.write_to(fwsp)
             print(':: Workspace saved to : {}'.format(fwsp))
 
@@ -142,6 +144,6 @@ if __name__ == "__main__":
 
     b = ini_bin(args.nside, args.fb)
 
-    ell, cl = est_cl(field1, field2, b, args.fwsp)
+    ell, cl = est_cl(field1, field2, b, args.fwsp, args.swsp)
 
     write_cls(ell, cl, args.foutcl, args.fb)
