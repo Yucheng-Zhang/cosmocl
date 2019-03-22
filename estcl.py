@@ -146,6 +146,6 @@ if __name__ == "__main__":
 
     b = ini_bin(args.nside, args.fb)
 
-    ell, cl = est_cl(field1, field2, b, args.fwsp, args.swsp)
+    ell, cl = est_cl(field1, field2, b, args.fwsp, args.savewsp)
 
     write_cls(ell, cl, args.foutcl, args.fb)
