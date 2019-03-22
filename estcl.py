@@ -114,7 +114,7 @@ def est_cl(fld1, fld2, b, fwsp, me='full'):
 def write_cls(ell, cl, fn, fb):
     '''Write [ell, cl, xerr]s to file.'''
     bbs = np.loadtxt(fb, dtype='int32')
-    xerr = (bbs[:, 1] - bbs[:, 0]) / 2.
+    xerr = (bbs[:, 1] - bbs[:, 0] + 1) / 2.
     data = np.column_stack((ell, cl, xerr))
     header = 'ell   cl   xerr'
     np.savetxt(fn, data, header=header)
