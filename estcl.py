@@ -7,6 +7,7 @@ import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
 import sys
+import os
 
 
 if __name__ == "__main__":
@@ -27,61 +28,97 @@ if __name__ == "__main__":
     parser.add_argument('-tp', type=str, default='auto',
                         help='auto or cross correlation.')
 
-#    parser.add_argument('-lmm', type=int, nargs='+',
-#                        default=[2, 600], help='lmin and lmax')
-    parser.add_argument('-nlb', type=int, default=1,
-                        help='Number of ells per bin.')
+    parser.add_argument('-foutcl', type=str, default='out-cl.dat',
+                        help='Output ell,cl file name.')
 
-    parser.add_argument('-foutcl', type=str,
-                        default='out-cl.dat', help='Output ell,cl file name.')
+    parser.add_argument('-fb', type=str, default='fb.dat',
+                        help='Data file which specifies the bins. \
+                            Two columns [lmin, lmax], closed on both sides.')
+
+    parser.add_argument('-fwsp', type=str, default='',
+                        help='Workspace file name.')
 
     args = parser.parse_args()
 
 
 def ini_field(mask, maps):
     '''Initialize pymaster field.'''
+    print('>> Initializing the field...')
     fld = nmt.NmtField(mask, [maps])
     return fld
 
 
-def ini_bin(nside, nlb):
+def ini_bin(nside, fb):
     '''Initialize the set of bins.'''
-    b = nmt.NmtBin(nside, nlb=nlb)
+    # load the file which includes bin bounds
+    # two columns [lmin,lmax], both included
+    print('>> Loading bin file: {}'.format(fb))
+    bbs = np.loadtxt(fb, dtype='int32')
+    ells = np.arange(bbs[0, 0], bbs[-1, -1] + 1, dtype='int32')
+    weights = np.zeros(len(ells))
+    bpws = -1 + np.zeros_like(ells)  # array of bandpower indices
+    ib = 0
+    for i, bb in enumerate(bbs):
+        nls = bb[1] - bb[0] + 1  # number of ells in the bin
+        ie = ib + nls  # not included
+        weights[ib:ie] = 1. / nls
+        bpws[ib:ie] = i
+        ib = ie
+
+    data = np.column_stack((ells, weights, bpws))
+    header = 'ells   weights   bandpower'
+    np.savetxt('bandpowers.dat', data, header=header)
+
+    print('>> Initializing bins...')
+    b = nmt.NmtBin(nside, bpws=bpws, ells=ells, weights=weights)
     return b
 
 
-def est_cl(fld1, fld2, b):
+def est_cl(fld1, fld2, b, fwsp, me='full'):
     '''Estimate Cl.'''
-    print('>> Estimating Cl...')
-
     # NmtWorkspace object used to compute and store the mode coupling matrix,
     # which only depends on the masks, not on the maps
     w = nmt.NmtWorkspace()
-    print('>> Computing coupling matrix...')
-    w.compute_coupling_matrix(fld1, fld2, b)
+    if os.path.isfile(fwsp):
+        print('>> Loading workspace (coupling matrix) from : {}'.format(fwsp))
+        w.read_from(fwsp)
+    else:
+        print('>> Computing coupling matrix...')
+        w.compute_coupling_matrix(fld1, fld2, b)
+        if fwsp != '':
+            w.write_to(fwsp)
+            print(':: Workspace saved to : {}'.format(fwsp))
 
-    # compute the coupled full-sky angular power spectra
-    # this is equivalent to Healpy.anafast on masked maps
-    print('>> Computing coupled Cl...')
-    cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
-
-    # decouple into bandpowers by inverting the binned coupling matrix
-    print('>> Decoupling Cl...')
-    cl_decoupled = w.decouple_cell(cl_coupled)[0]
+    if me == 'full':
+        print('>> Computing full master...')
+        cl = nmt.compute_full_master(fld1, fld2, b)
+        cl_decoupled = cl[0]
+    elif me == 'step':
+        # compute the coupled full-sky angular power spectra
+        # this is equivalent to Healpy.anafast on masked maps
+        print('>> Computing coupled Cl...')
+        cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        # decouple into bandpowers by inverting the binned coupling matrix
+        print('>> Decoupling Cl...')
+        cl_decoupled = w.decouple_cell(cl_coupled)[0]
+    else:
+        sys.exit('>> Wrong me.')
 
     # get the effective ells
-    print('>> Getting ')
+    print('>> Getting effective ells...')
     ell = b.get_effective_ells()
 
     return ell, cl_decoupled
 
 
-def write_cls(ell, cl, fn):
-    '''Write [ell, cl]s to file.'''
-    data = np.column_stack((ell, cl))
-    header = 'ell   cl'
+def write_cls(ell, cl, fn, fb):
+    '''Write [ell, cl, xerr]s to file.'''
+    bbs = np.loadtxt(fb, dtype='int32')
+    xerr = (bbs[:, 1] - bbs[:, 0]) / 2.
+    data = np.column_stack((ell, cl, xerr))
+    header = 'ell   cl   xerr'
     np.savetxt(fn, data, header=header)
-    print('>> Written to: {}'.format(fn))
+    print(':: Written to: {}'.format(fn))
 
 
 if __name__ == "__main__":
@@ -103,8 +140,8 @@ if __name__ == "__main__":
     else:
         sys.exit('>> Wrong correlation type!')
 
-    b = ini_bin(args.nside, args.nlb)
+    b = ini_bin(args.nside, args.fb)
 
-    ell, cl = est_cl(field1, field2, b)
+    ell, cl = est_cl(field1, field2, b, args.fwsp)
 
-    write_cls(ell, cl, args.foutcl)
+    write_cls(ell, cl, args.foutcl, args.fb)

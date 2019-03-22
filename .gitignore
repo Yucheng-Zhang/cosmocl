@@ -1,0 +1,5 @@
+*.fits
+*.dat
+test.sh
+test.py
+*.pyc
