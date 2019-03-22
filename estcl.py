@@ -37,6 +37,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-savewsp', type=int, default=0,
                         help='Save the workspace or not, which might be very large.')
+
     parser.add_argument('-fwsp', type=str, default='',
                         help='Workspace file name.')
 
@@ -50,7 +51,7 @@ def ini_field(mask, maps):
     return fld
 
 
-def ini_bin(nside, fb):
+def ini_bin(nside, fb, sbpws=False):
     '''Initialize the set of bins.'''
     # load the file which includes bin bounds
     # two columns [lmin,lmax], both included
@@ -67,9 +68,10 @@ def ini_bin(nside, fb):
         bpws[ib:ie] = i
         ib = ie
 
-    data = np.column_stack((ells, weights, bpws))
-    header = 'ells   weights   bandpower'
-    np.savetxt('bandpowers.dat', data, header=header)
+    if sbpws:
+        data = np.column_stack((ells, weights, bpws))
+        header = 'ells   weights   bandpower'
+        np.savetxt('bandpowers.dat', data, header=header)
 
     print('>> Initializing bins...')
     b = nmt.NmtBin(nside, bpws=bpws, ells=ells, weights=weights)
