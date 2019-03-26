@@ -34,7 +34,7 @@ def main_hp(args):
         mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
 
     print('>> Loading map 1: {}'.format(args.map1))
-    map1 = hp.read_map(args.map1)
+    map1 = hp.read_map(args.map1) * mask1
     alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
 
     if args.tp == 'cross':  # cross correlation
@@ -46,7 +46,7 @@ def main_hp(args):
             mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
 
         print('>> Loading map 2: {}'.format(args.map2))
-        map2 = hp.read_map(args.map2)
+        map2 = hp.read_map(args.map2) * mask2
         alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
     elif args.tp == 'auto':
         alm2 = None
@@ -54,6 +54,7 @@ def main_hp(args):
         sys.exit('>> Wrong correlation type!')
 
     cl = hp.alm2cl(alm1, alms2=alm2)
+    cl = cl / args.fsky
 
     data = bin_cl(cl, bbs)
     header = 'ell   cl   xerr'
