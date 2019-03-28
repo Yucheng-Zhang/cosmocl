@@ -8,10 +8,16 @@ import sys
 import os
 
 
-def ini_field(mask, maps):
+def ini_field(mask, maps, fwhm):
     '''Initialize pymaster field.'''
+    if fwhm > 0:
+        print(">> Computing Gaussian beam window function...")
+        lmax = 3 * hp.get_nside(mask) - 1  # required by PyMaster
+        bl = hp.gauss_beam(fwhm, lmax=lmax, pol=False)
+    else:
+        bl = None
     print('>> Initializing the field...')
-    fld = nmt.NmtField(mask, [maps])
+    fld = nmt.NmtField(mask, [maps], beam=bl)
     return fld
 
 
@@ -94,25 +100,25 @@ def main_master(args):
     print('>> Loading mask 1: {}'.format(args.mask1))
     mask1 = hp.read_map(args.mask1)
     if args.fwhm1 != -1:
-        print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
         fwhm1 = args.fwhm1 * np.pi / 180  # get fwhm in radians
-        mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
+    #     print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
+    #     mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
 
     print('>> Loading map 1: {}'.format(args.map1))
     map1 = hp.read_map(args.map1)
-    field1 = ini_field(mask1, map1)
+    field1 = ini_field(mask1, map1, fwhm1)
 
     if args.tp == 'cross':  # cross correlation
         print('>> Loading mask 2: {}'.format(args.mask2))
         mask2 = hp.read_map(args.mask2)
         if args.fwhm2 != -1:
-            print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
             fwhm2 = args.fwhm2 * np.pi / 180  # get fwhm in radians
-            mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
+        #     print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
+        #     mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
 
         print('>> Loading map 2: {}'.format(args.map2))
         map2 = hp.read_map(args.map2)
-        field2 = ini_field(mask2, map2)
+        field2 = ini_field(mask2, map2, fwhm2)
 
     elif args.tp == 'auto':  # auto correlation
         field2 = field1
