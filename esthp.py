@@ -28,10 +28,10 @@ def main_hp(args):
 
     print('>> Loading mask 1: {}'.format(args.mask1))
     mask1 = hp.read_map(args.mask1)
-    if args.fwhm1 != -1:
-        print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
-        fwhm1 = args.fwhm1 * np.pi / 180  # get fwhm in radians
-        mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
+    # if args.fwhm1 != -1:
+    #     fwhm1 = args.fwhm1 * np.pi / 180  # get fwhm in radians
+    #     print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
+    #     mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
 
     print('>> Loading map 1: {}'.format(args.map1))
     map1 = hp.read_map(args.map1) * mask1
@@ -40,16 +40,18 @@ def main_hp(args):
     if args.tp == 'cross':  # cross correlation
         print('>> Loading mask 2: {}'.format(args.mask2))
         mask2 = hp.read_map(args.mask2)
-        if args.fwhm2 != -1:
-            print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
-            fwhm2 = args.fwhm2 * np.pi / 180  # get fwhm in radians
-            mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
+        # if args.fwhm2 != -1:
+        #     fwhm2 = args.fwhm2 * np.pi / 180  # get fwhm in radians
+        #     print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
+        #     mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
 
         print('>> Loading map 2: {}'.format(args.map2))
         map2 = hp.read_map(args.map2) * mask2
         alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
+
     elif args.tp == 'auto':
         alm2 = None
+
     else:
         sys.exit('>> Wrong correlation type!')
 

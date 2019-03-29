@@ -11,7 +11,8 @@ import os
 def ini_field(mask, maps, fwhm):
     '''Initialize pymaster field.'''
     if fwhm > 0:
-        print(">> Computing Gaussian beam window function...")
+        print('>> Computing Gaussian beam window function, \
+                FWHM = {0:f} [radians]'.format(fwhm))
         lmax = 3 * hp.get_nside(mask) - 1  # required by PyMaster
         bl = hp.gauss_beam(fwhm, lmax=lmax, pol=False)
     else:
