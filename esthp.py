@@ -58,6 +58,6 @@ def main_hp(args):
 
     data = bin_cl(cl, bbs)
     header = 'ell   cl   xerr'
-    fn = args.foutcl
+    fn = args.focl
     np.savetxt(fn, data, header=header)
     print(':: Written to: {}'.format(fn))

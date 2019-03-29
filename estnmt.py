@@ -132,4 +132,4 @@ def main_master(args):
 
     ell, cl = est_cl(field1, field2, b, args.fwsp, args.savewsp)
 
-    write_cls(ell, cl, args.foutcl, args.fb)
+    write_cls(ell, cl, args.focl, args.fb)
