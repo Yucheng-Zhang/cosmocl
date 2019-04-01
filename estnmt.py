@@ -49,7 +49,7 @@ def ini_bin(nside, fb, sbpws=False):
     return b
 
 
-def est_cl(fld1, fld2, b, fwsp, swsp, me='full'):
+def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None):
     '''Estimate Cl.'''
     # NmtWorkspace object used to compute and store the mode coupling matrix,
     # which only depends on the masks, not on the maps
@@ -66,13 +66,16 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='full'):
 
     if me == 'full':
         print('>> Computing full master...')
-        cl = nmt.compute_full_master(fld1, fld2, b)
+        cl = nmt.compute_full_master(fld1, fld2, b, workspace=w)
         cl_decoupled = cl[0]
     elif me == 'step':
         # compute the coupled full-sky angular power spectra
         # this is equivalent to Healpy.anafast on masked maps
-        print('>> Computing coupled Cl...')
-        cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        if ccl == None:
+            print('>> Computing coupled Cl...')
+            cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        else:
+            cl_coupled = [ccl]
         # decouple into bandpowers by inverting the binned coupling matrix
         print('>> Decoupling Cl...')
         cl_decoupled = w.decouple_cell(cl_coupled)[0]
@@ -123,14 +126,17 @@ def main_master(args):
         map2 = hp.read_map(args.map2)
         field2 = ini_field(mask2, map2, fwhm2)
 
+        ccl = hp.anafast(map1, map2)
+
     elif args.tp == 'auto':  # auto correlation
         field2 = field1
+        ccl = hp.anafast(map1)
 
     else:
         sys.exit('>> Wrong correlation type!')
 
     b = ini_bin(args.nside, args.fb)
 
-    ell, cl = est_cl(field1, field2, b, args.fwsp, args.savewsp)
+    ell, cl = est_cl(field1, field2, b, args.fwsp, args.savewsp, ccl=ccl)
 
     write_cls(ell, cl, args.focl, args.fb)
