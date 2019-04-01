@@ -19,6 +19,11 @@ if __name__ == "__main__":
     parser.add_argument('-fb', type=str, default='fb.dat',
                         help='Data file which specifies the bins. \
                             Two columns [lmin, lmax], closed on both sides.')
+    parser.add_argument('-eccl', type=str, default='00',
+                        help='Estimation of coupled C_l. \
+                            0: multiply mask on the map first, \
+                               which is default in PyMaster; \
+                            1: not multiply mask on the map;')
 
     parser.add_argument('-nside', type=int, default=1024,
                         help='Nside of the masks and maps.')

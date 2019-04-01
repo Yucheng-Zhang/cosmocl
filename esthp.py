@@ -38,7 +38,9 @@ def main_hp(args):
         alm1 = hp.read_alm(args.alm1)
     elif args.map1 != '':
         print('>> Loading map 1: {}'.format(args.map1))
-        map1 = hp.read_map(args.map1) * mask1
+        map1 = hp.read_map(args.map1)
+        if args.eccl[0] == '1':
+            map1 = map1 * mask1
         alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
     else:
         sys.exit('No input map or alm 1.')
@@ -56,7 +58,9 @@ def main_hp(args):
             alm2 = hp.read_alm(args.alm2)
         elif args.map2 != '':
             print('>> Loading map 2: {}'.format(args.map2))
-            map2 = hp.read_map(args.map2) * mask2
+            map2 = hp.read_map(args.map2)
+            if args.eccl[1] == '1':
+                map2 = map2 * mask2
             alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
         else:
             sys.exit('No input map or alm 2.')
