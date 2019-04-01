@@ -35,7 +35,7 @@ def main_hp(args):
 
     if args.alm1 != '':
         print('>> Loading alm 1: {}'.format(args.alm1))
-        alm1 = hp.read_alm(args.alm1)[:lmax+1]
+        alm1 = hp.read_alm(args.alm1)
     elif args.map1 != '':
         print('>> Loading map 1: {}'.format(args.map1))
         map1 = hp.read_map(args.map1) * mask1
@@ -53,7 +53,7 @@ def main_hp(args):
 
         if args.alm2 != '':
             print('>> Loading alm 2: {}'.format(args.alm2))
-            alm2 = hp.read_alm(args.alm2)[:lmax+1]
+            alm2 = hp.read_alm(args.alm2)
         elif args.map2 != '':
             print('>> Loading map 2: {}'.format(args.map2))
             map2 = hp.read_map(args.map2) * mask2
@@ -67,7 +67,7 @@ def main_hp(args):
     else:
         sys.exit('>> Wrong correlation type!')
 
-    cl = hp.alm2cl(alm1, alms2=alm2)
+    cl = hp.alm2cl(alm1, alms2=alm2, lmax_out=lmax)
     cl = cl / args.fsky
 
     data = bin_cl(cl, bbs)
