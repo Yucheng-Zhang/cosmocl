@@ -71,11 +71,11 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None):
     elif me == 'step':
         # compute the coupled full-sky angular power spectra
         # this is equivalent to Healpy.anafast on masked maps
-        if ccl == None:
-            print('>> Computing coupled Cl...')
-            cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
-        else:
-            cl_coupled = [ccl]
+        # if ccl == None:
+        #     print('>> Computing coupled Cl...')
+        #     cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        # else:
+        cl_coupled = [ccl]
         # decouple into bandpowers by inverting the binned coupling matrix
         print('>> Decoupling Cl...')
         cl_decoupled = w.decouple_cell(cl_coupled)[0]
