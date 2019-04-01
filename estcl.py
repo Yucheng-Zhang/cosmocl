@@ -27,16 +27,21 @@ if __name__ == "__main__":
                         help='Input mask file 1.')
     parser.add_argument('-map1', type=str, default='',
                         help='Input map file 1.')
+    parser.add_argument('-alm1', type=str, default='',
+                        help='Input alm file 1.')
     parser.add_argument('-fwhm1', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
-                            [in degree] used to smooth mask 1.')
+                            [in degree] for emission map.')
+
     parser.add_argument('-mask2', type=str, default='',
                         help='Input mask file 2.')
     parser.add_argument('-map2', type=str, default='',
                         help='Input map file 2.')
+    parser.add_argument('-alm2', type=str, default='',
+                        help='Input alm file 2.')
     parser.add_argument('-fwhm2', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
-                            [in degree] used to smooth mask 2.')
+                            [in degree] for emission map.')
 
     #--- output related ---#
     parser.add_argument('-focl', type=str, default='out-cl.dat',

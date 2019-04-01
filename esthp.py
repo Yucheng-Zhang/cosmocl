@@ -33,9 +33,15 @@ def main_hp(args):
     #     print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
     #     mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
 
-    print('>> Loading map 1: {}'.format(args.map1))
-    map1 = hp.read_map(args.map1) * mask1
-    alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
+    if args.alm1 != '':
+        print('>> Loading alm 1: {}'.format(args.alm1))
+        alm1 = hp.read_alm(args.alm1)[:lmax+1]
+    elif args.map1 != '':
+        print('>> Loading map 1: {}'.format(args.map1))
+        map1 = hp.read_map(args.map1) * mask1
+        alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
+    else:
+        sys.exit('No input map or alm 1.')
 
     if args.tp == 'cross':  # cross correlation
         print('>> Loading mask 2: {}'.format(args.mask2))
@@ -45,9 +51,15 @@ def main_hp(args):
         #     print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
         #     mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
 
-        print('>> Loading map 2: {}'.format(args.map2))
-        map2 = hp.read_map(args.map2) * mask2
-        alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
+        if args.alm2 != '':
+            print('>> Loading alm 2: {}'.format(args.alm2))
+            alm2 = hp.read_alm(args.alm2)[:lmax+1]
+        elif args.map2 != '':
+            print('>> Loading map 2: {}'.format(args.map2))
+            map2 = hp.read_map(args.map2) * mask2
+            alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
+        else:
+            sys.exit('No input map or alm 2.')
 
     elif args.tp == 'auto':
         alm2 = None
