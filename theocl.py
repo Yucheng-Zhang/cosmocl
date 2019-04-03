@@ -43,6 +43,9 @@ if __name__ == "__main__":
 
     parser.add_argument('-dataz', type=str, help='Galaxy redshift file.')
 
+    parser.add_argument('-fo', type=str, default='output-cl.dat',
+                        help='Output file name.')
+
     args = parser.parse_args()
 
 
@@ -76,7 +79,7 @@ def gen_fg_z(dataz, z1, z2, bins=200):
         dataz, bins=bins, range=(z1, z2), density=True)
     bin_mids = (bin_edges[:-1] + bin_edges[1:]) / 2.
     xs = np.concatenate(([z1], bin_mids, [z2]))
-    ys = np.concatenate(([hist[0], hist, hist[-1]]))
+    ys = np.concatenate(([hist[0]], hist, [hist[-1]]))
 
     fg_z = spi.interp1d(xs, ys, kind='linear',
                         bounds_error=False, fill_value=(0., 0.))
@@ -160,12 +163,19 @@ if __name__ == "__main__":
     pk = gen_pk(pars, kmax, z1, z2)
 
     # generate fg(z)
+    print('>> Loading redshift data: {}'.format(args.dataz))
     dataz = np.loadtxt(args.dataz)
     fg = gen_fg_z(dataz, z1, z2)
 
     if args.cal == 'clgg':
-        clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg)
+        print('>> Calculating clgg...')
+        ell, cl = clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg)
     elif args.cal == 'clkg':
-        clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg)
+        print('>> Calculating clkg...')
+        ell, cl = clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg)
     else:
         sys.exit('>> Set -cal to one of [clgg, clkg].')
+
+    data = np.column_stack((ell, cl))
+    header = 'ell   cl'
+    np.savetxt(args.fo, data, header=header)
