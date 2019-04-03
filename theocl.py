@@ -179,3 +179,4 @@ if __name__ == "__main__":
     data = np.column_stack((ell, cl))
     header = 'ell   cl'
     np.savetxt(args.fo, data, header=header)
+    print(':: Written to file: {}'.format(args.fo))
