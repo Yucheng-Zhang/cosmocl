@@ -32,8 +32,6 @@ if __name__ == "__main__":
                         help='Input mask file 1.')
     parser.add_argument('-map1', type=str, default='',
                         help='Input map file 1.')
-    parser.add_argument('-alm1', type=str, default='',
-                        help='Input alm file 1.')
     parser.add_argument('-fwhm1', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
                             [in degree] for emission map.')
@@ -42,8 +40,7 @@ if __name__ == "__main__":
                         help='Input mask file 2.')
     parser.add_argument('-map2', type=str, default='',
                         help='Input map file 2.')
-    parser.add_argument('-alm2', type=str, default='',
-                        help='Input alm file 2.')
+
     parser.add_argument('-fwhm2', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
                             [in degree] for emission map.')
@@ -59,6 +56,10 @@ if __name__ == "__main__":
                         help='Workspace file name.')
 
     #--- for simple HealPy estimation ---#
+    parser.add_argument('-alm1', type=str, default='',
+                        help='Input alm file 1.')
+    parser.add_argument('-alm2', type=str, default='',
+                        help='Input alm file 2.')
     parser.add_argument('-fsky', type=float, default=1.0,
                         help='fsky if estimated with healpy.')
 
