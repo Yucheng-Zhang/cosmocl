@@ -161,11 +161,13 @@ if __name__ == "__main__":
     # generate PK
     kmax = (lmax + 100) / cosmo.z2chi(z1)
     pk = gen_pk(pars, kmax, z1, z2)
+    print('>> Matter power spectrum function generated with CAMB.')
 
     # generate fg(z)
     print('>> Loading redshift data: {}'.format(args.dataz))
     dataz = np.loadtxt(args.dataz)
     fg = gen_fg_z(dataz, z1, z2)
+    print('>> Galaxy redshift distribution function generated.')
 
     if args.cal == 'clgg':
         print('>> Calculating clgg...')
