@@ -23,6 +23,7 @@ def bin_cl(cl, bbs):
 
 def main_hp(args):
     '''Main function for simple Healpy estimation.'''
+    print('>> Simple fsky estimation.')
     bbs = np.loadtxt(args.fb, dtype='int32')
     lmax = bbs[-1, -1]
 
@@ -40,6 +41,7 @@ def main_hp(args):
         print('>> Loading map 1: {}'.format(args.map1))
         map1 = hp.read_map(args.map1)
         if args.eccl[0] == '0':
+            print(':: Multiplying mask on the map ::')
             map1 = map1 * mask1
         alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
     else:
@@ -60,6 +62,7 @@ def main_hp(args):
             print('>> Loading map 2: {}'.format(args.map2))
             map2 = hp.read_map(args.map2)
             if args.eccl[1] == '0':
+                print(':: Multiplying mask on the map ::')
                 map2 = map2 * mask2
             alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
         else:

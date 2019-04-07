@@ -101,6 +101,7 @@ def write_cls(ell, cl, fn, fb):
 
 def main_master(args):
     '''Main function for NaMaster estimation.'''
+    print('>> MASTER estimation.')
     ccl = None  # coupled C_l
 
     print('>> Loading mask 1: {}'.format(args.mask1))
@@ -128,11 +129,13 @@ def main_master(args):
         map2 = hp.read_map(args.map2)
         field2 = ini_field(mask2, map2, fwhm2)
         if args.eccl[0] == '1':
+            print(':: Coupled C_l without multiplying mask on the map ::')
             ccl = hp.anafast(map1, map2=map2)
 
     elif args.tp == 'auto':  # auto correlation
         field2 = field1
         if args.eccl[1] == '1':
+            print(':: Coupled C_l without multiplying mask on the map ::')
             ccl = hp.anafast(map1)
 
     else:
