@@ -39,7 +39,7 @@ def main_hp(args):
     elif args.map1 != '':
         print('>> Loading map 1: {}'.format(args.map1))
         map1 = hp.read_map(args.map1)
-        if args.eccl[0] == '1':
+        if args.eccl[0] == '0':
             map1 = map1 * mask1
         alm1 = hp.map2alm(map1, lmax=lmax, pol=False)
     else:
@@ -59,7 +59,7 @@ def main_hp(args):
         elif args.map2 != '':
             print('>> Loading map 2: {}'.format(args.map2))
             map2 = hp.read_map(args.map2)
-            if args.eccl[1] == '1':
+            if args.eccl[1] == '0':
                 map2 = map2 * mask2
             alm2 = hp.map2alm(map2, lmax=lmax, pol=False)
         else:
