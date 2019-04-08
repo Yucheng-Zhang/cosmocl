@@ -109,8 +109,8 @@ def main_master(args):
     fwhm1 = args.fwhm1
     if fwhm1 != -1:
         fwhm1 = fwhm1 * np.pi / 180  # get fwhm in radians
-    #     print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
-    #     mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
+        print('>> Smoothing mask1, FWHM: {0:f} degrees'.format(args.fwhm1))
+        mask1 = hp.smoothing(mask1, fwhm=fwhm1, pol=False)
 
     print('>> Loading map 1: {}'.format(args.map1))
     map1 = hp.read_map(args.map1)
@@ -122,8 +122,8 @@ def main_master(args):
         fwhm2 = args.fwhm2
         if fwhm2 != -1:
             fwhm2 = args.fwhm2 * np.pi / 180  # get fwhm in radians
-        #     print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
-        #     mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
+            print('>> Smoothing mask2, FWHM: {0:f} degrees'.format(args.fwhm2))
+            mask2 = hp.smoothing(mask2, fwhm=fwhm2, pol=False)
 
         print('>> Loading map 2: {}'.format(args.map2))
         map2 = hp.read_map(args.map2)
