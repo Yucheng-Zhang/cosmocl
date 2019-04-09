@@ -1,22 +1,21 @@
 '''
 Functions for simple estimation with Healpy.
 '''
-import pymaster as nmt
 import numpy as np
 import healpy as hp
 import sys
-import os
 
 
 def bin_cl(cl, bbs):
     '''Bin cl with bin file.'''
-    ell_b, cl_b = [], []
+    ell_b, cl_b, yerr = [], [], []
     for bb in bbs:
         ell_b.append((bb[0] + bb[1]) / 2.)
         cl_b.append(np.mean(cl[bb[0]:bb[1]+1]))
+        yerr.append(np.std(cl[bb[0]:bb[1]+1], ddof=1))
     xerr = (bbs[:, 1] - bbs[:, 0] + 1) / 2.
 
-    data = np.column_stack((ell_b, cl_b, xerr))
+    data = np.column_stack((ell_b, cl_b, xerr, yerr))
 
     return data
 
@@ -78,7 +77,7 @@ def main_hp(args):
     cl = cl / args.fsky
 
     data = bin_cl(cl, bbs)
-    header = 'ell   cl   xerr'
+    header = 'ell   cl   xerr   yerr'
     fn = args.focl
     np.savetxt(fn, data, header=header)
     print(':: Written to: {}'.format(fn))
