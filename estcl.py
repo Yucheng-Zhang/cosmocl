@@ -54,6 +54,8 @@ if __name__ == "__main__":
                         help='Save the workspace or not, which might be very large.')
     parser.add_argument('-fwsp', type=str, default='',
                         help='Workspace file name.')
+    parser.add_argument('-cerr', type=int, default=0,
+                        help='Calculate the Gaussian error for Cl or not.')
 
     #--- for simple HealPy estimation ---#
     parser.add_argument('-alm1', type=str, default='',

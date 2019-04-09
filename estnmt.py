@@ -49,7 +49,18 @@ def ini_bin(nside, fb, sbpws=False):
     return b
 
 
-def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None):
+def gaussian_err(cl, w):
+    '''Gaussian estimate of the covariance -> error.'''
+    print('>> Computing Gaussian estimate of the covariance...')
+    cw = nmt.NmtCovarianceWorkspace()
+    cw.compute_coupling_coefficients(w, w)
+    covar = nmt.gaussian_covariance(cw, cl, cl, cl, cl)
+    err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
+
+    return err
+
+
+def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None, cerr=False):
     '''Estimate Cl.'''
     # NmtWorkspace object used to compute and store the mode coupling matrix,
     # which only depends on the masks, not on the maps
@@ -68,6 +79,7 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None):
         print('>> Computing full master...')
         cl = nmt.compute_full_master(fld1, fld2, b, workspace=w)
         cl_decoupled = cl[0]
+
     elif me == 'step':
         if ccl is None:
             # compute the coupled full-sky angular power spectra
@@ -79,22 +91,28 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None):
         # decouple into bandpowers by inverting the binned coupling matrix
         print('>> Decoupling Cl...')
         cl_decoupled = w.decouple_cell(cl_coupled)[0]
+
     else:
         sys.exit('>> Wrong me.')
+
+    if cerr:  # compute the Gaussian err
+        clerr = gaussian_err(cl_coupled[0], w)
+    else:
+        clerr = np.array([0.] * len(cl_decoupled))
 
     # get the effective ells
     print('>> Getting effective ells...')
     ell = b.get_effective_ells()
 
-    return ell, cl_decoupled
+    return ell, cl_decoupled, clerr
 
 
-def write_cls(ell, cl, fn, fb):
+def write_cls(ell, cl, clerr, fn, fb):
     '''Write [ell, cl, xerr]s to file.'''
     bbs = np.loadtxt(fb, dtype='int32')
     xerr = (bbs[:, 1] - bbs[:, 0] + 1) / 2.
-    data = np.column_stack((ell, cl, xerr))
-    header = 'ell   cl   xerr'
+    data = np.column_stack((ell, cl, xerr, clerr))
+    header = 'ell   cl   xerr   yerr'
     np.savetxt(fn, data, header=header)
     print(':: Written to: {}'.format(fn))
 
@@ -143,6 +161,7 @@ def main_master(args):
 
     b = ini_bin(args.nside, args.fb)
 
-    ell, cl = est_cl(field1, field2, b, args.fwsp, args.savewsp, ccl=ccl)
+    ell, cl, clerr = est_cl(field1, field2, b, args.fwsp,
+                            args.savewsp, ccl=ccl, cerr=args.cerr)
 
-    write_cls(ell, cl, args.focl, args.fb)
+    write_cls(ell, cl, clerr, args.focl, args.fb)
