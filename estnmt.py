@@ -11,8 +11,8 @@ import os
 def ini_field(mask, maps, fwhm):
     '''Initialize pymaster field.'''
     if fwhm > 0:
-        print('>> Computing Gaussian beam window function, \
-                FWHM = {0:f} [radians]'.format(fwhm))
+        print('>> Computing Gaussian beam window function, FWHM = {0:f} [radians]'
+              .format(fwhm))
         lmax = 3 * hp.get_nside(mask) - 1  # required by PyMaster
         bl = hp.gauss_beam(fwhm, lmax=lmax, pol=False)
     else:
@@ -49,15 +49,15 @@ def ini_bin(nside, fb, sbpws=False):
     return b
 
 
-def gaussian_err(cl, w):
-    '''Gaussian estimate of the covariance -> error.'''
-    print('>> Computing Gaussian estimate of the covariance...')
-    cw = nmt.NmtCovarianceWorkspace()
-    cw.compute_coupling_coefficients(w, w)
-    covar = nmt.gaussian_covariance(cw, cl, cl, cl, cl)
-    err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
+# def gaussian_err(w, fld1, fld2):
+#     '''Gaussian estimate of the covariance -> error.'''
+#     print('>> Computing Gaussian estimate of the covariance...')
+#     cw = nmt.NmtCovarianceWorkspace()
+#     cw.compute_coupling_coefficients(w, w)
+#     covar = nmt.gaussian_covariance(cw, cl, cl, cl, cl)
+#     err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
 
-    return err
+#     return err
 
 
 def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None, cerr=False):
@@ -95,10 +95,10 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None, cerr=False):
     else:
         sys.exit('>> Wrong me.')
 
-    if cerr:  # compute the Gaussian err
-        clerr = gaussian_err(cl_coupled[0], w)
-    else:
-        clerr = np.array([0.] * len(cl_decoupled))
+    # if cerr:  # compute the Gaussian err
+    #     clerr = gaussian_err(cl_coupled[0], w)
+    # else:
+    clerr = np.array([0.] * len(cl_decoupled))
 
     # get the effective ells
     print('>> Getting effective ells...')
@@ -163,5 +163,7 @@ def main_master(args):
 
     ell, cl, clerr = est_cl(field1, field2, b, args.fwsp,
                             args.savewsp, ccl=ccl, cerr=args.cerr)
+
+    # compute Gaussian error
 
     write_cls(ell, cl, clerr, args.focl, args.fb)
