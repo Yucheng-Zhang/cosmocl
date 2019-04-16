@@ -180,5 +180,5 @@ if __name__ == "__main__":
 
     data = np.column_stack((ell, cl))
     header = 'ell   cl'
-    np.savetxt(args.fo, data, header=header)
+    np.savetxt(args.fo, data, fmt='%6d %15.7e', header=header)
     print(':: Written to file: {}'.format(args.fo))
