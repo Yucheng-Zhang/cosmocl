@@ -106,15 +106,16 @@ def clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg):
         p2 = pk.P(z, ell/chi_z) * bkg
         return p1*p2
 
+    def target(ell):
+        # print('>> Integrating ell {0:d}...'.format(ell))
+        return spint.quad(clkg_kernel, z1, z2, args=(ell,))[0]
+
     ells = np.arange(lmin, lmax+1, 1, dtype='int32')
-    clkgs = np.zeros(len(ells))
-    errs = np.zeros(len(ells))
 
-    for i, ell in enumerate(ells):
-        print('>> Integrating ell {0:d}...'.format(ell))
-        y, err = spint.quad(clkg_kernel, z1, z2, args=(ell,))
-        clkgs[i], errs[i] = y, err
+    num_cpus = mp.cpu_count()
+    clkgs = Parallel(n_jobs=num_cpus)(delayed(target)(ell) for ell in ells)
 
+    clkgs = np.array(clkgs)
     fac = 3. * cosmo.H0**2 * cosmo.Om0 / (2. * C_LIGHT**2)
     clkgs = clkgs * fac
 
@@ -130,18 +131,12 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
         return p1*p2
 
     def target(ell):
-        print('>> Integrating ell {0:d}...'.format(ell))
-        y, err = spint.quad(clgg_kernel, z1, z2, args=(ell,))
-        return y
+        # print('>> Integrating ell {0:d}...'.format(ell))
+        return spint.quad(clgg_kernel, z1, z2, args=(ell,))[0]
 
     ells = np.arange(lmin, lmax+1, 1, dtype='int32')
 
     num_cpus = mp.cpu_count()
-    # pool = mp.Pool(num_cpus)
-    # clggs = pool.map(target, ells)
-    # pool.close()
-    # pool.join()
-
     clggs = Parallel(n_jobs=num_cpus)(delayed(target)(ell) for ell in ells)
 
     clggs = np.array(clggs)
