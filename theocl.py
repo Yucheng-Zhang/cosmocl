@@ -8,6 +8,7 @@ from astropy.cosmology import LambdaCDM
 import camb
 import argparse
 import sys
+import multiprocessing as mp
 
 C_LIGHT = 299792.458  # speed of light in km/s
 Z_CMB = 1100
@@ -127,15 +128,19 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
         p2 = pk.P(z, ell/chi_z) * bgg**2
         return p1*p2
 
-    ells = np.arange(lmin, lmax+1, 1, dtype='int32')
-    clggs = np.zeros(len(ells))
-    errs = np.zeros(len(ells))
-
-    for i, ell in enumerate(ells):
+    def target(ell):
         print('>> Integrating ell {0:d}...'.format(ell))
         y, err = spint.quad(clgg_kernel, z1, z2, args=(ell,))
-        clggs[i], errs[i] = y, err
+        return y
 
+    ells = np.arange(lmin, lmax+1, 1, dtype='int32')
+
+    pool = mp.Pool(mp.cpu_count())
+    clggs = pool.map(target, ells)
+    pool.close()
+    pool.join()
+
+    clggs = np.array(clggs)
     clggs = clggs / C_LIGHT
 
     return ells, clggs
