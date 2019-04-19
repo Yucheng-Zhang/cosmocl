@@ -142,7 +142,7 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
     # pool.close()
     # pool.join()
 
-    clggs = Parallel(n_jobs=n_cpus)(delayed(target)(ell) for ell in ells)
+    clggs = Parallel(n_jobs=num_cpus)(delayed(target)(ell) for ell in ells)
 
     clggs = np.array(clggs)
     clggs = clggs / C_LIGHT
