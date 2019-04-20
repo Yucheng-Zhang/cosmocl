@@ -78,7 +78,7 @@ def gaussian_err(w, fcl, focov):
     return err
 
 
-def est_cl(w, fld1, fld2, b, me='step', ccl=None, cerr=False):
+def est_cl(w, fld1, fld2, b, me='step', ccl=None):
     '''Estimate Cl.'''
 
     if me == 'full':
@@ -167,7 +167,7 @@ def main_master(args):
             print(':: Workspace saved to : {}'.format(fwsp))
 
     # estimate the power spectrum
-    ell, cl = est_cl(w, field1, field2, b, ccl=ccl, cerr=args.cerr)
+    ell, cl = est_cl(w, field1, field2, b, ccl=ccl)
 
     # compute Gaussian covariance
     if args.fcl != '':
