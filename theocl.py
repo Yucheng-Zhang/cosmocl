@@ -145,7 +145,8 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
     return ells, clggs
 
 
-if __name__ == "__main__":
+def main_theocl(args):
+    '''Main function for theoretical calculation of cl.'''
     lmin, lmax = args.lmm[0], args.lmm[1]
     z1, z2 = args.z1z2[0], args.z1z2[1]
 
@@ -181,6 +182,13 @@ if __name__ == "__main__":
         ell, cl = clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg)
     else:
         sys.exit('>> Set -cal to one of [clgg, clkg].')
+
+    return ell, cl
+
+
+if __name__ == "__main__":
+
+    ell, cl = main_theocl(args)
 
     data = np.column_stack((ell, cl))
     header = 'ell   cl'

@@ -8,6 +8,16 @@ import sys
 import os
 
 
+def write_cls(ell, cl, clerr, fn, fb):
+    '''Write [ell, cl, xerr]s to file.'''
+    bbs = np.loadtxt(fb, dtype='int32')
+    xerr = (bbs[:, 1] - bbs[:, 0] + 1) / 2.
+    data = np.column_stack((ell, cl, xerr, clerr))
+    header = 'ell   cl   xerr   yerr'
+    np.savetxt(fn, data, header=header)
+    print(':: Written to: {}'.format(fn))
+
+
 def ini_field(mask, maps, fwhm):
     '''Initialize pymaster field.'''
     if fwhm > 0:
@@ -49,31 +59,27 @@ def ini_bin(nside, fb, sbpws=False):
     return b
 
 
-# def gaussian_err(w, fld1, fld2):
-#     '''Gaussian estimate of the covariance -> error.'''
-#     print('>> Computing Gaussian estimate of the covariance...')
-#     cw = nmt.NmtCovarianceWorkspace()
-#     cw.compute_coupling_coefficients(w, w)
-#     covar = nmt.gaussian_covariance(cw, cl, cl, cl, cl)
-#     err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
+def gaussian_err(w, fcl, focov):
+    '''Gaussian estimate of the covariance -> error.'''
+    print('>> Computing Gaussian estimate of the covariance matrix...')
+    # load the predicted Cl from theoretical calculation
+    cl_t = np.loadtxt(fcl)[:, -1]
 
-#     return err
+    cw = nmt.NmtCovarianceWorkspace()
+    cw.compute_coupling_coefficients(w, w)
+    covar = nmt.gaussian_covariance(cw, cl_t, cl_t, cl_t, cl_t)
+    err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
+
+    # write covariance matrix to file
+    header = 'covariance matrix'
+    np.savetxt(focov, covar, fmt='%.7e', header=header)
+    print(':: covariance matrix written to: {}'.format(focov))
+
+    return err
 
 
-def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None, cerr=False):
+def est_cl(w, fld1, fld2, b, me='step', ccl=None, cerr=False):
     '''Estimate Cl.'''
-    # NmtWorkspace object used to compute and store the mode coupling matrix,
-    # which only depends on the masks, not on the maps
-    w = nmt.NmtWorkspace()
-    if os.path.isfile(fwsp):
-        print('>> Loading workspace (coupling matrix) from : {}'.format(fwsp))
-        w.read_from(fwsp)
-    else:
-        print('>> Computing coupling matrix...')
-        w.compute_coupling_matrix(fld1, fld2, b)
-        if fwsp != '' and swsp:
-            w.write_to(fwsp)
-            print(':: Workspace saved to : {}'.format(fwsp))
 
     if me == 'full':
         print('>> Computing full master...')
@@ -95,26 +101,11 @@ def est_cl(fld1, fld2, b, fwsp, swsp, me='step', ccl=None, cerr=False):
     else:
         sys.exit('>> Wrong me.')
 
-    # if cerr:  # compute the Gaussian err
-    #     clerr = gaussian_err(cl_coupled[0], w)
-    # else:
-    clerr = np.array([0.] * len(cl_decoupled))
-
     # get the effective ells
     print('>> Getting effective ells...')
     ell = b.get_effective_ells()
 
-    return ell, cl_decoupled, clerr
-
-
-def write_cls(ell, cl, clerr, fn, fb):
-    '''Write [ell, cl, xerr]s to file.'''
-    bbs = np.loadtxt(fb, dtype='int32')
-    xerr = (bbs[:, 1] - bbs[:, 0] + 1) / 2.
-    data = np.column_stack((ell, cl, xerr, clerr))
-    header = 'ell   cl   xerr   yerr'
-    np.savetxt(fn, data, header=header)
-    print(':: Written to: {}'.format(fn))
+    return ell, cl_decoupled
 
 
 def main_master(args):
@@ -161,9 +152,27 @@ def main_master(args):
 
     b = ini_bin(args.nside, args.fb)
 
-    ell, cl, clerr = est_cl(field1, field2, b, args.fwsp,
-                            args.savewsp, ccl=ccl, cerr=args.cerr)
+    # NmtWorkspace object used to compute and store the mode coupling matrix,
+    # which only depends on the masks, not on the maps
+    w = nmt.NmtWorkspace()
+    fwsp = args.fwsp
+    if os.path.isfile(fwsp):
+        print('>> Loading workspace (coupling matrix) from : {}'.format(fwsp))
+        w.read_from(fwsp)
+    else:
+        print('>> Computing coupling matrix...')
+        w.compute_coupling_matrix(field1, field2, b)
+        if fwsp != '' and args.swsp:
+            w.write_to(fwsp)
+            print(':: Workspace saved to : {}'.format(fwsp))
 
-    # compute Gaussian error
+    # estimate the power spectrum
+    ell, cl = est_cl(w, field1, field2, b, ccl=ccl, cerr=args.cerr)
+
+    # compute Gaussian covariance
+    if args.fcl != '':
+        clerr = gaussian_err(w, args.fcl, args.focov)
+    else:
+        clerr = np.array([0.] * len(cl))
 
     write_cls(ell, cl, clerr, args.focl, args.fb)

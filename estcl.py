@@ -54,8 +54,10 @@ if __name__ == "__main__":
                         help='Save the workspace or not, which might be very large.')
     parser.add_argument('-fwsp', type=str, default='',
                         help='Workspace file name.')
-    parser.add_argument('-cerr', type=int, default=0,
-                        help='Calculate the Gaussian error for Cl or not.')
+    parser.add_argument('-fcl', type=str, default='',
+                        help='Predicted Cl used to calculate gaussian covariance.')
+    parser.add_argument('-focov', type=str, default='output_cov.dat',
+                        help='Output covariance matrix file.')
 
     #--- for simple HealPy estimation ---#
     parser.add_argument('-alm1', type=str, default='',
