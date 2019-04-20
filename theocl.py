@@ -108,7 +108,7 @@ def clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg):
 
     def target(ell):
         # print('>> Integrating ell {0:d}...'.format(ell))
-        return spint.quad(clkg_kernel, z1, z2, args=(ell,))[0]
+        return spint.quad(clkg_kernel, z1, z2, args=(ell,), full_output=1)[0]
 
     ells = np.arange(lmin, lmax+1, 1, dtype='int32')
 
@@ -132,7 +132,7 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
 
     def target(ell):
         # print('>> Integrating ell {0:d}...'.format(ell))
-        return spint.quad(clgg_kernel, z1, z2, args=(ell,))[0]
+        return spint.quad(clgg_kernel, z1, z2, args=(ell,), full_output=1)[0]
 
     ells = np.arange(lmin, lmax+1, 1, dtype='int32')
 
