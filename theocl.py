@@ -145,6 +145,53 @@ def clgg(lmin, lmax, cosmo, z1, z2, fg, pk, bgg):
     return ells, clggs
 
 
+def clmm(lmin, lmax, cosmo, z1, z2, fg, pk):
+    '''C_l^mm, LCDM & Limber approximation.'''
+    def clmm_kernel(z, ell):
+        chi_z = cosmo.z2chi(z)
+        p1 = cosmo.H_z(z) * fg(z)**2 / chi_z**2
+        p2 = pk.P(z, ell/chi_z)
+        return p1*p2
+
+    def target(ell):
+        # print('>> Integrating ell {0:d}...'.format(ell))
+        return spint.quad(clmm_kernel, z1, z2, args=(ell,), full_output=1)[0]
+
+    ells = np.arange(lmin, lmax+1, 1, dtype='int32')
+
+    num_cpus = mp.cpu_count()
+    clmms = Parallel(n_jobs=num_cpus)(delayed(target)(ell) for ell in ells)
+
+    clmms = np.array(clmms)
+    clmms = clmms / C_LIGHT
+
+    return ells, clmms
+
+
+def qlmm(lmin, lmax, cosmo, z1, z2, fg, pk):
+    '''Q_l^mm, LCDM & Limber approximation.'''
+    def qlmm_kernel(z, ell):
+        chi_z = cosmo.z2chi(z)
+        p1 = (1 + z) * cosmo.w_z(z) * fg(z) / chi_z**2
+        p2 = pk.P(z, ell/chi_z)
+        return p1*p2
+
+    def target(ell):
+        # print('>> Integrating ell {0:d}...'.format(ell))
+        return spint.quad(qlmm_kernel, z1, z2, args=(ell,), full_output=1)[0]
+
+    ells = np.arange(lmin, lmax+1, 1, dtype='int32')
+
+    num_cpus = mp.cpu_count()
+    qlmms = Parallel(n_jobs=num_cpus)(delayed(target)(ell) for ell in ells)
+
+    qlmms = np.array(qlmms)
+    fac = 1. / 2.
+    qlmms = qlmms * fac
+
+    return ells, qlmms
+
+
 def main_theocl(args):
     '''Main function for theoretical calculation of cl.'''
     lmin, lmax = args.lmm[0], args.lmm[1]
@@ -180,8 +227,14 @@ def main_theocl(args):
     elif args.cal == 'clkg':
         print('>> Calculating clkg...')
         ell, cl = clkg(lmin, lmax, cosmo, z1, z2, fg, pk, bkg)
+    elif args.cal == 'clmm':
+        print('>> Calculating clmm...')
+        ell, cl = clmm(lmin, lmax, cosmo, z1, z2, fg, pk)
+    elif args.cal == 'qlmm':
+        print('>> Calculating qlmm...')
+        ell, cl = qlmm(lmin, lmax, cosmo, z1, z2, fg, pk)
     else:
-        sys.exit('>> Set -cal to one of [clgg, clkg].')
+        sys.exit('>> Set -cal to one of [clgg, clkg, clmm, qlmm].')
 
     return ell, cl
 
