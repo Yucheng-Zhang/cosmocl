@@ -10,10 +10,11 @@ from cosmopy.cosmoLCDM import cosmoLCDM
 from cosmopy.utils import gen_fg_z
 
 C_LIGHT = 299792.458  # speed of light in km/s
+Z_CMB = 1100
 
 
 class theocls:
-    '''Theoretical power spectra, w/ Limber approximation.'''
+    '''Theoretical linear power spectra, w/ Limber approximation.'''
 
     def __init__(self, lmin, lmax, z1, z2, fg, b, cosmo):
         self.lmin, self.lmax = lmin, lmax
@@ -23,6 +24,7 @@ class theocls:
         self.cosmo = cosmo  # cosmoLCDM instance
 
         kmax = (self.lmax + 100) / self.cosmo.z2chi(self.z1)
+        print('>> kmax = {0:f}'.format(kmax))
         self.cosmo.gen_pk(kmax, self.z1, self.z2)
 
         self.ells = np.arange(lmin, lmax+1, 1, dtype='int32')
@@ -65,9 +67,48 @@ class theocls:
         def target(ell):
             return spint.quad(clgg_kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
 
+        print('>> Computing C_l^gg...')
         clggs = Parallel(n_jobs=self.num_cpus)(
             delayed(target)(ell) for ell in self.ells)
 
         clggs = np.array(clggs) / C_LIGHT
 
         return clggs
+
+    def c_clmg(self):
+        '''Compute C_l^mg.'''
+        def clmg_kernel(z, ell):
+            chi_z = self.cosmo.z2chi(z)
+            p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
+            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)
+            return p1*p2
+
+        def target(ell):
+            return spint.quad(clmg_kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
+
+        print('>> Computing C_l^mg...')
+        clmgs = Parallel(n_jobs=self.num_cpus)(
+            delayed(target)(ell) for ell in self.ells)
+
+        clmgs = np.array(clmgs) / C_LIGHT
+
+        return clmgs
+
+    def c_qlgg(self):
+        '''Compute Q_l^gg.'''
+        def qlgg_kernel(z, ell):
+            chi_z = self.cosmo.z2chi(z)
+            p1 = (1 + z) * self.cosmo.w_z(z) * self.fg(z) / chi_z**2
+            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)**2
+            return p1*p2
+
+        def target(ell):
+            return spint.quad(qlgg_kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
+
+        print('>> Computing Q_l^gg...')
+        qlggs = Parallel(n_jobs=self.num_cpus)(
+            delayed(target)(ell) for ell in self.ells)
+
+        qlggs = np.array(qlggs) / 2.
+
+        return qlggs
