@@ -3,8 +3,6 @@ Theoretical calculation of Cl.
 '''
 import numpy as np
 import scipy.integrate as spint
-import argparse
-import sys
 import multiprocessing as mp
 from joblib import Parallel, delayed
 
