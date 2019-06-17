@@ -23,8 +23,9 @@ class theocls:
         self.b = b  # linear bias function
         self.cosmo = cosmo  # cosmoLCDM instance
 
-        kmax = (self.lmax + 100) / self.cosmo.z2chi(self.z1)
-        print('>> kmax = {0:f}'.format(kmax))
+        chi_z1 = self.cosmo.z2chi(self.z1)
+        kmax = (self.lmax + 100) / chi_z1
+        print('>> chi(z1) = {0:f}, kmax used = {1:f}'.format(chi_z1, kmax))
         self.cosmo.gen_pk(kmax, self.z1, self.z2)
 
         self.ells = np.arange(lmin, lmax+1, 1, dtype='int32')
