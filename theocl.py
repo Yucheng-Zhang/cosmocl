@@ -28,7 +28,7 @@ class theocls:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
-    def set_pk(self, zmin=0, zmax=5, iz=0, kmax=10, extrap_kmax=200):
+    def set_pk(self, zmin=0, zmax=5, iz=0.002, kmax=10, extrap_kmax=200):
         self.cosmo.gen_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
         self.iz = iz
         print(':: PK interpolator settings ::')
@@ -37,7 +37,7 @@ class theocls:
         print(':: note: for points out of range, the returned value is the boundary value')
         print(':: Integral settings ::')
         print(':: integral over z starts from {0:g}'.format(iz))
-        print(':: lmax = {0:d}, maximum k = {2:g}'.format(
+        print(':: lmax = {0:d}, maximum k = {1:g}'.format(
             self.lmax, self.lmax/self.cosmo.z2chi(self.iz)))
 
     def get_ells(self):
