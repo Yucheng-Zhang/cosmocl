@@ -16,14 +16,14 @@ Z_CMB = 1100
 class theocls:
     '''Theoretical linear power spectra, w/ Limber approximation.'''
 
-    def __init__(self, lmin, lmax, z1, z2, fg, b, cosmo):
-        self.lmin, self.lmax = lmin, lmax
+    def __init__(self, ells, z1, z2, fg, b, cosmo):
+        self.lmin, self.lmax = np.amin(ells), np.amax(ells)
         self.z1, self.z2 = z1, z2
         self.fg = fg  # redshift distribution function
         self.b = b  # linear bias function
         self.cosmo = cosmo  # cosmoLCDM instance
 
-        self.ells = np.arange(lmin, lmax+1, 1, dtype='int32')
+        self.ells = ells
 
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
@@ -37,7 +37,7 @@ class theocls:
         print(':: note: for points out of range, the returned value is the boundary value')
         print(':: Integral settings ::')
         print(':: integral over z starts from {0:g}'.format(iz))
-        print(':: lmax = {0:d}, maximum k = {1:g}'.format(
+        print(':: lmax = {0:g}, maximum k = {1:g}'.format(
             self.lmax, self.lmax/self.cosmo.z2chi(self.iz)))
 
     def get_ells(self):
@@ -205,7 +205,7 @@ class theocls:
             return p1*p2
 
         def target(ell):
-            return spint.quad(kernel, self.iz, Z_CMB, args=(ell,))[0]
+            return spint.quad(kernel, self.iz, Z_CMB, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kk...')
         clkks = Parallel(n_jobs=self.num_cpus)(
