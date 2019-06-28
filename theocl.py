@@ -37,7 +37,10 @@ class theocls:
         print(':: (for points out of range, the returned value is the boundary value)')
         print(':: NOTE: integral over z from 0 will start from chi2z(ell/extrap_kmax)')
 
-        self.kmax = extrap_kmax
+        if extrap_kmax is None:
+            self.kmax = kmax
+        else:
+            self.kmax = extrap_kmax
 
     def set_chi2z(self, zmin, zmax, dz):
         check = np.amax(self.ells) / self.kmax / self.cosmo.z2chi(zmax)
