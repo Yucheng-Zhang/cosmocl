@@ -33,7 +33,9 @@ class theocls:
         self.cosmo.gen_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
         print(':: PK interpolator settings ::')
         print(':: zmin = {0:g}, zmax = {1:g}'.format(zmin, zmax))
-        print(':: kmax = {0:g}, extrap_kmax = {1:g}'.format(kmax, extrap_kmax))
+        print(':: kmax = {0:g}'.format(kmax))
+        if extrap_kmax is not None:
+            print(':: extrap_kmax = {0:g}'.format(extrap_kmax))
         print(':: (for points out of range, the returned value is the boundary value)')
         print(':: NOTE: integral over z from 0 will start from chi2z(ell/extrap_kmax)')
 
