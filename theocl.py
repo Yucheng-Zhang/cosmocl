@@ -5,6 +5,7 @@ import numpy as np
 import scipy.integrate as spint
 import multiprocessing as mp
 from joblib import Parallel, delayed
+import sys
 
 from cosmopy.cosmoLCDM import cosmoLCDM
 from cosmopy.utils import gen_fg_z
@@ -28,17 +29,23 @@ class theocls:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
-    def set_pk(self, zmin=0, zmax=5, iz=0.002, kmax=10, extrap_kmax=200):
+    def set_pk(self, zmin, zmax, kmax, extrap_kmax=None):
         self.cosmo.gen_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
-        self.iz = iz
         print(':: PK interpolator settings ::')
         print(':: zmin = {0:g}, zmax = {1:g}'.format(zmin, zmax))
         print(':: kmax = {0:g}, extrap_kmax = {1:g}'.format(kmax, extrap_kmax))
-        print(':: note: for points out of range, the returned value is the boundary value')
-        print(':: Integral settings ::')
-        print(':: integral over z starts from {0:g}'.format(iz))
-        print(':: lmax = {0:g}, maximum k = {1:g}'.format(
-            self.lmax, self.lmax/self.cosmo.z2chi(self.iz)))
+        print(':: (for points out of range, the returned value is the boundary value)')
+        print(':: NOTE: integral over z from 0 will start from chi2z(ell/extrap_kmax)')
+
+        self.kmax = extrap_kmax
+
+    def set_chi2z(self, zmin, zmax, dz):
+        check = np.amax(self.ells) / self.kmax / self.cosmo.z2chi(zmax)
+        print('-- check = {0:.2f}'.format(check))
+        if check > 1:
+            sys.exit('-- set_chi2z: zmax not large enough')
+
+        self.cosmo.gen_chi2z(zmin=zmin, zmax=zmax, dz=dz)
 
     def get_ells(self):
         return self.ells
@@ -159,8 +166,9 @@ class theocls:
             return p1*p2
 
         def target(ell):
+            iz = self.cosmo.chi2z(ell/self.kmax)
             return spint.tplquad(kernel, self.z1, self.z2, lambda x: self.z1, lambda x: self.z2,
-                                 lambda x, y: self.iz, lambda x, y: min(x, y), args=(ell,))[0]
+                                 lambda x, y: iz, lambda x, y: min(x, y), args=(ell,))[0]
 
         print('>> Computing C_l^g2g2...')
         clg2g2s = Parallel(n_jobs=self.num_cpus)(
@@ -183,7 +191,8 @@ class theocls:
             return p1*p2
 
         def target(ell):
-            return spint.dblquad(kernel, self.z1, self.z2, lambda x: self.iz, lambda x: x, args=(ell,))[0]
+            iz = self.cosmo.chi2z(ell/self.kmax)
+            return spint.dblquad(kernel, self.z1, self.z2, lambda x: iz, lambda x: x, args=(ell,))[0]
 
         print('>> Computing C_l^kg2...')
         clkg2s = Parallel(n_jobs=self.num_cpus)(
@@ -205,7 +214,8 @@ class theocls:
             return p1*p2
 
         def target(ell):
-            return spint.quad(kernel, self.iz, Z_CMB, args=(ell,), full_output=1)[0]
+            iz = self.cosmo.chi2z(ell/self.kmax)
+            return spint.quad(kernel, iz, Z_CMB, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kk...')
         clkks = Parallel(n_jobs=self.num_cpus)(
