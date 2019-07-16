@@ -29,8 +29,6 @@ class theocls:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
-        self.cosmo.init_CAMB()
-
     def set_interp_pk(self, zmin, zmax, kmax, extrap_kmax=None):
         self.cosmo.gen_interp_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
         print(':: PK interpolator settings ::')
@@ -129,7 +127,7 @@ class theocls:
         '''Compute Q_l^gg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = (1 + z) * self.cosmo.w_z(z) * self.fg(z) / chi_z**2
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * self.fg(z) / chi_z**2
             p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)**2
             return p1*p2
 
@@ -150,7 +148,7 @@ class theocls:
         '''Compute C_l^g1g2.'''
         def kernel(z2, z1, ell):
             chi_z2 = self.cosmo.interp_z2chi(z2)
-            p1 = (1 + z2) * self.cosmo.w_z(z2, zs=z1) * \
+            p1 = (1 + z2) * self.cosmo.interp_w_z(z2, zs=z1) * \
                 self.fg(z1) * self.fg(z2) / chi_z2**2
             p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2) * self.b(z2)
             return p1*p2
@@ -173,8 +171,9 @@ class theocls:
         '''Compute C_l^g2g2.'''
         def kernel(z3, z2, z1, ell):
             chi_z3 = self.cosmo.interp_z2chi(z3)
-            p1 = self.fg(z1) * self.fg(z2) * (1 + z3)**2 * self.cosmo.w_z(z3, zs=z1) * \
-                self.cosmo.w_z(z3, zs=z2) / self.cosmo.H_z(z3) / chi_z3**2
+            p1 = self.fg(z1) * self.fg(z2) * (1 + z3)**2 * self.cosmo.interp_w_z(z3, zs=z1) * \
+                self.cosmo.interp_w_z(z3, zs=z2) / \
+                self.cosmo.H_z(z3) / chi_z3**2
             p2 = self.cosmo.interp_pk.P(z3, ell/chi_z3)
             return p1*p2
 
@@ -198,7 +197,7 @@ class theocls:
         '''Compute C_l^kg2.'''
         def kernel(z2, z1, ell):
             chi_z2 = self.cosmo.interp_z2chi(z2)
-            p1 = (1 + z2)**2 * self.cosmo.w_z(z2, zs=z1) * self.cosmo.w_z(z2) * \
+            p1 = (1 + z2)**2 * self.cosmo.interp_w_z(z2, zs=z1) * self.cosmo.interp_w_z(z2) * \
                 self.fg(z1) / self.cosmo.H_z(z2) / chi_z2**2
             p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2)
             return p1*p2
@@ -246,7 +245,7 @@ class theocls:
         '''Compute C_l^kg,NL.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = self.fg(z) * (self.b(z) - 1) * self.cosmo.w_z(z) / \
+            p1 = self.fg(z) * (self.b(z) - 1) * self.cosmo.interp_w_z(z) / \
                 self.cosmo.interp_Tk((ell+1./2.)/chi_z) / \
                 self.cosmo.interp_D_z(z)
             p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
@@ -269,7 +268,7 @@ class theocls:
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
             p1 = self.cosmo.f_growth_z(z) * self.fg(z) * \
-                self.cosmo.w_z(z) / chi_z**2
+                self.cosmo.interp_w_z(z) / chi_z**2
             p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
             return p1*p2
 
