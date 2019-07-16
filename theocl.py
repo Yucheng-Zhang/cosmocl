@@ -29,7 +29,7 @@ class theocls:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
-    def set_pk(self, zmin, zmax, kmax, extrap_kmax=None):
+    def set_interp_pk(self, zmin, zmax, kmax, extrap_kmax=None):
         self.cosmo.gen_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
         print(':: PK interpolator settings ::')
         print(':: zmin = {0:g}, zmax = {1:g}'.format(zmin, zmax))
@@ -44,13 +44,19 @@ class theocls:
         else:
             self.kmax = extrap_kmax
 
-    def set_chi2z(self, zmin, zmax, dz):
+    def set_interp_chiz(self, zmin, zmax, dz):
         check = np.amax(self.ells) / self.kmax / self.cosmo.z2chi(zmax)
         print('-- check = {0:.2f}'.format(check))
         if check > 1:
             sys.exit('-- set_chi2z: zmax not large enough')
 
-        self.cosmo.gen_chi2z(zmin=zmin, zmax=zmax, dz=dz)
+        self.cosmo.gen_interp_chiz(zmin=zmin, zmax=zmax, dz=dz)
+
+    def set_interp_Tk(self, kmax):
+        self.cosmo.gen_interp_Tk(kmax)
+
+    def set_interp_D_z(self, zmin, zmax, dz):
+        self.cosmo.gen_interp_D_z(zmin=zmin, zmax=zmax, dz=dz)
 
     def get_ells(self):
         return self.ells
@@ -60,9 +66,9 @@ class theocls:
     def c_clkg(self):
         '''Compute C_l^kg.'''
         def kernel(z, ell):
-            chi_z = self.cosmo.z2chi(z)
+            chi_z = self.cosmo.interp_z2chi(z)
             p1 = (1 + z) * self.cosmo.w_z(z) * self.fg(z) / chi_z**2
-            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)
             return p1*p2
 
         def target(ell):
@@ -80,9 +86,9 @@ class theocls:
     def c_clgg(self):
         '''Compute C_l^gg.'''
         def kernel(z, ell):
-            chi_z = self.cosmo.z2chi(z)
+            chi_z = self.cosmo.interp_z2chi(z)
             p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
-            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)**2
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)**2
             return p1*p2
 
         def target(ell):
@@ -101,9 +107,9 @@ class theocls:
     def c_clmg(self):
         '''Compute C_l^mg.'''
         def kernel(z, ell):
-            chi_z = self.cosmo.z2chi(z)
+            chi_z = self.cosmo.interp_z2chi(z)
             p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
-            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)
             return p1*p2
 
         def target(ell):
@@ -120,9 +126,9 @@ class theocls:
     def c_qlgg(self):
         '''Compute Q_l^gg.'''
         def kernel(z, ell):
-            chi_z = self.cosmo.z2chi(z)
+            chi_z = self.cosmo.interp_z2chi(z)
             p1 = (1 + z) * self.cosmo.w_z(z) * self.fg(z) / chi_z**2
-            p2 = self.cosmo.pk.P(z, ell/chi_z) * self.b(z)**2
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)**2
             return p1*p2
 
         def target(ell):
@@ -141,10 +147,10 @@ class theocls:
     def c_clg1g2(self, s):
         '''Compute C_l^g1g2.'''
         def kernel(z2, z1, ell):
-            chi_z2 = self.cosmo.z2chi(z2)
+            chi_z2 = self.cosmo.interp_z2chi(z2)
             p1 = (1 + z2) * self.cosmo.w_z(z2, zs=z1) * \
                 self.fg(z1) * self.fg(z2) / chi_z2**2
-            p2 = self.cosmo.pk.P(z2, ell/chi_z2) * self.b(z2)
+            p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2) * self.b(z2)
             return p1*p2
 
         def target(ell):
@@ -164,14 +170,14 @@ class theocls:
     def c_clg2g2(self, s):
         '''Compute C_l^g2g2.'''
         def kernel(z3, z2, z1, ell):
-            chi_z3 = self.cosmo.z2chi(z3)
+            chi_z3 = self.cosmo.interp_z2chi(z3)
             p1 = self.fg(z1) * self.fg(z2) * (1 + z3)**2 * self.cosmo.w_z(z3, zs=z1) * \
                 self.cosmo.w_z(z3, zs=z2) / self.cosmo.H_z(z3) / chi_z3**2
-            p2 = self.cosmo.pk.P(z3, ell/chi_z3)
+            p2 = self.cosmo.interp_pk.P(z3, ell/chi_z3)
             return p1*p2
 
         def target(ell):
-            iz = self.cosmo.chi2z(ell/self.kmax)
+            iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.tplquad(kernel, self.z1, self.z2, lambda x: self.z1, lambda x: self.z2,
                                  lambda x, y: iz, lambda x, y: min(x, y), args=(ell,))[0]
 
@@ -189,14 +195,14 @@ class theocls:
     def c_clkg2(self, s):
         '''Compute C_l^kg2.'''
         def kernel(z2, z1, ell):
-            chi_z2 = self.cosmo.z2chi(z2)
+            chi_z2 = self.cosmo.interp_z2chi(z2)
             p1 = (1 + z2)**2 * self.cosmo.w_z(z2, zs=z1) * self.cosmo.w_z(z2) * \
                 self.fg(z1) / self.cosmo.H_z(z2) / chi_z2**2
-            p2 = self.cosmo.pk.P(z2, ell/chi_z2)
+            p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2)
             return p1*p2
 
         def target(ell):
-            iz = self.cosmo.chi2z(ell/self.kmax)
+            iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.dblquad(kernel, self.z1, self.z2, lambda x: iz, lambda x: x, args=(ell,))[0]
 
         print('>> Computing C_l^kg2...')
@@ -215,11 +221,11 @@ class theocls:
             chi_z = self.cosmo.z2chi(z)
             w_z = self.cosmo.w_z(z)
             p1 = (1 + z)**2 * w_z**2 / self.cosmo.H_z(z) / chi_z**2
-            p2 = self.cosmo.pk.P(z, ell/chi_z)
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
             return p1*p2
 
         def target(ell):
-            iz = self.cosmo.chi2z(ell/self.kmax)
+            iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.quad(kernel, iz, Z_CMB, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kk...')
@@ -231,3 +237,53 @@ class theocls:
         clkks = np.array(clkks) * fac
 
         return clkks
+
+    # ------ fNL & RSD ------ #
+
+    def c_clkg_nl(self):
+        '''Compute C_l^kg,NL.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            p1 = self.fg(z) * (self.b(z) - 1) * self.cosmo.w_z(z) / \
+                self.cosmo.interp_Tk((ell+1./2.)/chi_z) / \
+                self.cosmo.interp_D_z(z)
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
+            return p1*p2
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] / (ell+1./2.)**2
+
+        print('>> Computing C_l^kg,nl...')
+        clkgnls = Parallel(n_jobs=self.num_cpus)(
+            delayed(target)(ell) for ell in self.ells)
+
+        fac = 9./2. * (self.cosmo.H0 / C_LIGHT)**4 * self.cosmo.Om0**2 * 1.686
+        clkgnls = np.array(clkgnls) * fac
+
+        return clkgnls
+
+    def c_clkg_r(self):
+        '''Compute C_l^kg,RSD.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            p1 = self.cosmo.f_growth_z(z) * self.fg(z) * \
+                self.cosmo.w_z(z) / chi_z**2
+            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
+            return p1*p2
+
+        def target(ell):
+            Gl = (2*ell**2 + 2*ell - 1) / (2*ell - 1) / (2*ell + 3)
+            Gl -= ell*(ell - 1) * np.power(ell+1./2., 1./2.) / \
+                (4*ell - 2) / np.power(ell-3./2., 3./2.)
+            Gl -= (ell+1)*(ell+2) * np.power(ell+1./2., 1./2.) / \
+                (4*ell+6) / np.power(ell+5./2., 3./2.)
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * Gl
+
+        print('>> Computing C_l^kg,RSD...')
+        clkgrs = Parallel(n_jobs=self.num_cpus)(
+            delayed(target)(ell) for ell in self.ells)
+
+        fac = 3./2. * (self.cosmo.H0/C_LIGHT)**2 * self.cosmo.Om0
+        clkgrs = np.array(clkgrs) * fac
+
+        return clkgrs
