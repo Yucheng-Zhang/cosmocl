@@ -29,8 +29,10 @@ class theocls:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
+        self.cosmo.init_CAMB()
+
     def set_interp_pk(self, zmin, zmax, kmax, extrap_kmax=None):
-        self.cosmo.gen_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
+        self.cosmo.gen_interp_pk(zmin, zmax, kmax, extrap_kmax=extrap_kmax)
         print(':: PK interpolator settings ::')
         print(':: zmin = {0:g}, zmax = {1:g}'.format(zmin, zmax))
         print(':: kmax = {0:g}'.format(kmax))
@@ -67,7 +69,7 @@ class theocls:
         '''Compute C_l^kg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = (1 + z) * self.cosmo.w_z(z) * self.fg(z) / chi_z**2
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * self.fg(z) / chi_z**2
             p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)
             return p1*p2
 
