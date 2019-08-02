@@ -12,6 +12,7 @@ from cosmopy.utils import gen_fg_z
 
 C_LIGHT = 299792.458  # speed of light in km/s
 Z_CMB = 1100
+DELTA_C = 1.686
 
 
 class theocls:
@@ -67,40 +68,39 @@ class theocls:
         '''Compute C_l^kg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = (1 + z) * self.cosmo.interp_w_z(z) * self.fg(z) / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)
-            return p1*p2
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
+                self.fg(z) * self.b(z) / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kg...')
-        clkgs = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = 3. * self.cosmo.H0**2 * self.cosmo.Om0 / (2. * C_LIGHT**2)
-        clkgs = np.array(clkgs) * fac
+        cl = np.array(cl) * fac
 
-        return clkgs
+        return cl
 
     def c_clgg(self):
         '''Compute C_l^gg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)**2
-            return p1*p2
+            p1 = self.cosmo.H_z(z) * self.fg(z)**2 * self.b(z)**2 / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^gg...')
-        clggs = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
-        clggs = np.array(clggs) / C_LIGHT
+        cl = np.array(cl) / C_LIGHT
 
-        return clggs
+        return cl
 
     # ------ C_Gamma calibration ------ #
 
@@ -108,39 +108,38 @@ class theocls:
         '''Compute C_l^mg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)
-            return p1*p2
+            p1 = self.cosmo.H_z(z) * self.fg(z)**2 * self.b(z) / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^mg...')
-        clmgs = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
-        clmgs = np.array(clmgs) / C_LIGHT
+        cl = np.array(cl) / C_LIGHT
 
-        return clmgs
+        return cl
 
     def c_qlgg(self):
         '''Compute Q_l^gg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = (1 + z) * self.cosmo.interp_w_z(z) * self.fg(z) / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z) * self.b(z)**2
-            return p1*p2
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
+                self.fg(z) * self.b(z)**2 / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0]
 
         print('>> Computing Q_l^gg...')
-        qlggs = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
-        qlggs = np.array(qlggs) / 2.
+        cl = np.array(cl) / 2.
 
-        return qlggs
+        return cl
 
     # ------ Magnification bias calibration ------ #
 
@@ -149,23 +148,22 @@ class theocls:
         def kernel(z2, z1, ell):
             chi_z2 = self.cosmo.interp_z2chi(z2)
             p1 = (1 + z2) * self.cosmo.interp_w_z(z2, zs=z1) * \
-                self.fg(z1) * self.fg(z2) / chi_z2**2
-            p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2) * self.b(z2)
-            return p1*p2
+                self.fg(z1) * self.fg(z2) * self.b(z2) / chi_z2**2
+            return p1 * self.cosmo.interp_pk.P(z2, ell/chi_z2)
 
         def target(ell):
             return spint.dblquad(kernel, self.z1, self.z2, lambda x: self.z1, lambda x: x, args=(ell,))[0]
 
         print('>> Computing C_l^g1g2...')
-        clg1g2s = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = 3. * self.cosmo.H0**2 * self.cosmo.Om0 / C_LIGHT**2
         fac = fac * (5./2. * s - 1)
 
-        clg1g2s = np.array(clg1g2s) * fac
+        cl = np.array(cl) * fac
 
-        return clg1g2s
+        return cl
 
     def c_clg2g2(self, s):
         '''Compute C_l^g2g2.'''
@@ -174,8 +172,7 @@ class theocls:
             p1 = self.fg(z1) * self.fg(z2) * (1 + z3)**2 * self.cosmo.interp_w_z(z3, zs=z1) * \
                 self.cosmo.interp_w_z(z3, zs=z2) / \
                 self.cosmo.H_z(z3) / chi_z3**2
-            p2 = self.cosmo.interp_pk.P(z3, ell/chi_z3)
-            return p1*p2
+            return p1 * self.cosmo.interp_pk.P(z3, ell/chi_z3)
 
         def target(ell):
             iz = self.cosmo.interp_chi2z(ell/self.kmax)
@@ -183,15 +180,15 @@ class theocls:
                                  lambda x, y: iz, lambda x, y: min(x, y), args=(ell,))[0]
 
         print('>> Computing C_l^g2g2...')
-        clg2g2s = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = (3 * self.cosmo.H0**2 * self.cosmo.Om0 /
                C_LIGHT**2)**2 * (5./2. * s - 1)**2 * C_LIGHT
 
-        clg2g2s = np.array(clg2g2s) * fac
+        cl = np.array(cl) * fac
 
-        return clg2g2s
+        return cl
 
     def c_clkg2(self, s):
         '''Compute C_l^kg2.'''
@@ -199,22 +196,21 @@ class theocls:
             chi_z2 = self.cosmo.interp_z2chi(z2)
             p1 = (1 + z2)**2 * self.cosmo.interp_w_z(z2, zs=z1) * self.cosmo.interp_w_z(z2) * \
                 self.fg(z1) / self.cosmo.H_z(z2) / chi_z2**2
-            p2 = self.cosmo.interp_pk.P(z2, ell/chi_z2)
-            return p1*p2
+            return p1 * self.cosmo.interp_pk.P(z2, ell/chi_z2)
 
         def target(ell):
             iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.dblquad(kernel, self.z1, self.z2, lambda x: iz, lambda x: x, args=(ell,))[0]
 
         print('>> Computing C_l^kg2...')
-        clkg2s = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = 1./2. * (3 * self.cosmo.H0**2 * self.cosmo.Om0 /
                        C_LIGHT**2)**2 * (5./2. * s - 1) * C_LIGHT
-        clkg2s = np.array(clkg2s) * fac
+        cl = np.array(cl) * fac
 
-        return clkg2s
+        return cl
 
     def c_clkk(self):
         '''Compute C_l^kk.'''
@@ -222,55 +218,62 @@ class theocls:
             chi_z = self.cosmo.z2chi(z)
             w_z = self.cosmo.w_z(z)
             p1 = (1 + z)**2 * w_z**2 / self.cosmo.H_z(z) / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
-            return p1*p2
+            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
             iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.quad(kernel, iz, Z_CMB, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kk...')
-        clkks = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = 1./4. * (3 * self.cosmo.H0**2 *
                        self.cosmo.Om0 / C_LIGHT**2)**2 * C_LIGHT
-        clkks = np.array(clkks) * fac
+        cl = np.array(cl) * fac
 
-        return clkks
+        return cl
 
     # ------ fNL & RSD ------ #
+
+    def K_ell(self, ell):
+        '''A function of ell due to RSD.'''
+        p1 = (2*np.power(ell, 2) + 2*ell - 1) / \
+            ((2*ell-1) * (2*ell+3) * np.sqrt(ell+1./2.))
+        p2 = - ell * (ell-1) / (2 * (2*ell-1) * np.power(ell-3./2., 3./2.))
+        p3 = - (ell+1) * (ell+2) / (2 * (2*ell+3) * np.power(ell+5./2., 3./2.))
+        return p1 + p2 + p3
 
     def c_clkg_nl(self):
         '''Compute C_l^kg,NL.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
             p1 = self.fg(z) * (self.b(z) - 1) * self.cosmo.interp_w_z(z) / \
-                self.cosmo.interp_Tk((ell+1./2.)/chi_z) / \
-                self.cosmo.interp_D_z(z)
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
-            return p1*p2
+                self.cosmo.interp_Tk(k) / self.cosmo.interp_D_z(z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] / (ell+1./2.)**2
 
         print('>> Computing C_l^kg,nl...')
-        clkgnls = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
-        fac = 9./2. * (self.cosmo.H0 / C_LIGHT)**4 * self.cosmo.Om0**2 * 1.686
-        clkgnls = np.array(clkgnls) * fac
+        fac = 9./2. * (self.cosmo.H0 / C_LIGHT)**4 * \
+            self.cosmo.Om0**2 * DELTA_C
+        cl = np.array(cl) * fac
 
-        return clkgnls
+        return cl
 
     def c_clkg_r(self):
         '''Compute C_l^kg,RSD.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
             p1 = self.cosmo.f_growth_z(z) * self.fg(z) * \
                 self.cosmo.interp_w_z(z) / chi_z**2
-            p2 = self.cosmo.interp_pk.P(z, ell/chi_z)
-            return p1*p2
+            return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
             Gl = (2*ell**2 + 2*ell - 1) / (2*ell - 1) / (2*ell + 3)
@@ -281,10 +284,118 @@ class theocls:
             return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * Gl
 
         print('>> Computing C_l^kg,RSD...')
-        clkgrs = Parallel(n_jobs=self.num_cpus)(
-            delayed(target)(ell) for ell in self.ells)
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
 
         fac = 3./2. * (self.cosmo.H0/C_LIGHT)**2 * self.cosmo.Om0
-        clkgrs = np.array(clkgrs) * fac
+        cl = np.array(cl) * fac
 
-        return clkgrs
+        return cl
+
+    def c_clgg_0f(self):
+        '''Compute C_l^gg,0f.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = self.fg(z)**2 * self.cosmo.H_z(z) * self.b(z) * (self.b(z) - 1) / \
+                self.cosmo.interp_Tk(k) / self.cosmo.interp_D_z(z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] / (ell+1./2.)**2
+
+        print('>> Computing C_l^gg,0f...')
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        fac = 3. * self.cosmo.Om0 * self.cosmo.H0**2 * DELTA_C / C_LIGHT**3
+        cl = np.array(cl) * fac
+
+        return cl
+
+    def c_clgg_ff(self):
+        '''Compute C_l^gg,ff.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = self.cosmo.H_z(z) * self.fg(z)**2 * chi_z**2 * (self.b(z)-1)**2 / \
+                self.cosmo.interp_Tk(k)**2 / self.cosmo.interp_D_z(z)**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] / (ell+1./2.)**4
+
+        print('>> Computing C_l^gg,ff...')
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        fac = 9. * self.cosmo.Om0**2 * self.cosmo.H0**4 * DELTA_C**2 / C_LIGHT**5
+        cl = np.array(cl) * fac
+
+        return cl
+
+    def c_clgg_0r(self):
+        '''Compute C_l^gg,0r.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = np.power(chi_z, -2) * self.b(z) * \
+                self.cosmo.f_growth_z(z) * self.cosmo.H_z(z) * self.fg(z)**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * \
+                self.K_ell(ell) * np.sqrt(ell+1./2.)
+
+        print('>> Computing C_l^gg,0r...')
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        fac = 1. / C_LIGHT
+        cl = np.array(cl) * fac
+
+        return cl
+
+    def c_clgg_rr(self):
+        '''Compute C_l^gg,rr.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = np.power(chi_z, -2) * self.cosmo.f_growth_z(z)**2 * \
+                self.cosmo.H_z(z) * self.fg(z)**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * \
+                (ell+1./2.) * self.K_ell(ell)**2
+
+        print('>> Computing C_l^gg,rr...')
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        fac = 1. / C_LIGHT
+        cl = np.array(cl) * fac
+
+        return cl
+
+    def c_clgg_fr(self):
+        '''Compute C_l^gg,fr.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = (self.b(z)-1) * self.cosmo.f_growth_z(z) * self.fg(z)**2 * self.cosmo.H_z(z) / \
+                self.cosmo.interp_Tk(k) / self.cosmo.interp_D_z(z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * \
+                self.K_ell(ell) / np.power(ell+1./2., 3./2.)
+
+        print('>> Computing C_l^gg,fr...')
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        fac = 3. * self.cosmo.Om0 * self.cosmo.H0**2 * DELTA_C / C_LIGHT**3
+        cl = np.array(cl) * fac
+
+        return cl
