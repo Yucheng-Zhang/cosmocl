@@ -276,12 +276,13 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            Gl = (2*ell**2 + 2*ell - 1) / (2*ell - 1) / (2*ell + 3)
-            Gl -= ell*(ell - 1) * np.power(ell+1./2., 1./2.) / \
-                (4*ell - 2) / np.power(ell-3./2., 3./2.)
-            Gl -= (ell+1)*(ell+2) * np.power(ell+1./2., 1./2.) / \
-                (4*ell+6) / np.power(ell+5./2., 3./2.)
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * Gl
+            # Gl = (2*ell**2 + 2*ell - 1) / (2*ell - 1) / (2*ell + 3)
+            # Gl -= ell*(ell - 1) * np.power(ell+1./2., 1./2.) / \
+            #     (4*ell - 2) / np.power(ell-3./2., 3./2.)
+            # Gl -= (ell+1)*(ell+2) * np.power(ell+1./2., 1./2.) / \
+            #     (4*ell+6) / np.power(ell+5./2., 3./2.)
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1)[0] * \
+                self.K_ell(ell) * np.sqrt(ell+1./2.)
 
         print('>> Computing C_l^kg,RSD...')
         cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
