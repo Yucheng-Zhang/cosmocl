@@ -216,12 +216,13 @@ class theocls:
         '''Compute C_l^kk.'''
         def kernel(z, ell):
             chi_z = self.cosmo.z2chi(z)
+            k = (ell + 1./2.) / chi_z
             w_z = self.cosmo.w_z(z)
             p1 = (1 + z)**2 * w_z**2 / self.cosmo.H_z(z) / chi_z**2
-            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            iz = self.cosmo.interp_chi2z(ell/self.kmax)
+            iz = self.cosmo.interp_chi2z((ell+1./2.)/self.kmax)
             return spint.quad(kernel, iz, Z_CMB, args=(ell,), full_output=1)[0]
 
         print('>> Computing C_l^kk...')
