@@ -35,15 +35,18 @@ if __name__ == "__main__":
     parser.add_argument('-fwhm1', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
                             [in degree] for emission map.')
+    parser.add_argument('-temp1', type=str, default='',
+                        help='Noise template 1.')
 
     parser.add_argument('-mask2', type=str, default='',
                         help='Input mask file 2.')
     parser.add_argument('-map2', type=str, default='',
                         help='Input map file 2.')
-
     parser.add_argument('-fwhm2', type=float, default=-1,
                         help='Full Width Half Max of the Gaussian beam \
                             [in degree] for emission map.')
+    parser.add_argument('-temp2', type=str, default='',
+                        help='Noise template 2.')
 
     #--- output related ---#
     parser.add_argument('-focl', type=str, default='out-cl.dat',

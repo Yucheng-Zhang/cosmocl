@@ -18,7 +18,7 @@ def write_cls(ell, cl, clerr, fn, fb):
     print(':: Written to: {}'.format(fn))
 
 
-def ini_field(mask, maps, fwhm):
+def ini_field(mask, maps, fwhm, temp):
     '''Initialize pymaster field.'''
     if fwhm > 0:
         print('>> Computing Gaussian beam window function, FWHM = {0:f} [radians]'
@@ -28,7 +28,7 @@ def ini_field(mask, maps, fwhm):
     else:
         bl = None
     print('>> Initializing the field...')
-    fld = nmt.NmtField(mask, [maps], beam=bl)
+    fld = nmt.NmtField(mask, [maps], beam=bl, templates=temp)
     return fld
 
 
@@ -59,23 +59,23 @@ def ini_bin(nside, fb, sbpws=False):
     return b
 
 
-def gaussian_err(w, fcl, focov):
-    '''Gaussian estimate of the covariance -> error.'''
-    print('>> Computing Gaussian estimate of the covariance matrix...')
-    # load the predicted Cl from theoretical calculation
-    cl_t = np.loadtxt(fcl)[:, -1]
+# def gaussian_err(w, fcl, focov):
+#     '''Gaussian estimate of the covariance -> error.'''
+#     print('>> Computing Gaussian estimate of the covariance matrix...')
+#     # load the predicted Cl from theoretical calculation
+#     cl_t = np.loadtxt(fcl)[:, -1]
 
-    cw = nmt.NmtCovarianceWorkspace()
-    cw.compute_coupling_coefficients(w, w)
-    covar = nmt.gaussian_covariance(cw, cl_t, cl_t, cl_t, cl_t)
-    err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
+#     cw = nmt.NmtCovarianceWorkspace()
+#     cw.compute_coupling_coefficients(w, w)
+#     covar = nmt.gaussian_covariance(cw, cl_t, cl_t, cl_t, cl_t)
+#     err = np.sqrt(np.array([covar[i, i] for i in range(len(covar[0]))]))
 
-    # write covariance matrix to file
-    header = 'covariance matrix'
-    np.savetxt(focov, covar, fmt='%.7e', header=header)
-    print(':: covariance matrix written to: {}'.format(focov))
+#     # write covariance matrix to file
+#     header = 'covariance matrix'
+#     np.savetxt(focov, covar, fmt='%.7e', header=header)
+#     print(':: covariance matrix written to: {}'.format(focov))
 
-    return err
+#     return err
 
 
 def est_cl(w, fld1, fld2, b, me='step', ccl=None):
@@ -123,7 +123,12 @@ def main_master(args):
 
     print('>> Loading map 1: {}'.format(args.map1))
     map1 = hp.read_map(args.map1)
-    field1 = ini_field(mask1, map1, fwhm1)
+    if args.temp1 != '':
+        print('>> Loading template 1: {}'.format(args.temp1))
+        temp1 = [[hp.read_map(args.temp1)]]
+    else:
+        temp1 = None
+    field1 = ini_field(mask1, map1, fwhm1, temp1)
 
     if args.tp == 'cross':  # cross correlation
         print('>> Loading mask 2: {}'.format(args.mask2))
@@ -136,7 +141,12 @@ def main_master(args):
 
         print('>> Loading map 2: {}'.format(args.map2))
         map2 = hp.read_map(args.map2)
-        field2 = ini_field(mask2, map2, fwhm2)
+        if args.temp2 != '':
+            print('>> Loading template 2: {}'.format(args.temp2))
+            temp2 = [[hp.read_map(args.temp2)]]
+        else:
+            temp2 = None
+        field2 = ini_field(mask2, map2, fwhm2, temp2)
         if args.eccl[0] == '1':
             print(':: Coupled C_l without multiplying mask on the map ::')
             ccl = hp.anafast(map1, map2=map2)
@@ -171,7 +181,8 @@ def main_master(args):
 
     # compute Gaussian covariance
     if args.fcl != '':
-        clerr = gaussian_err(w, args.fcl, args.focov)
+        # clerr = gaussian_err(w, args.fcl, args.focov)
+        pass
     else:
         clerr = np.array([0.] * len(cl))
 
