@@ -38,20 +38,17 @@ class theocls:
         if extrap_kmax is not None:
             print(':: extrap_kmax = {0:g}'.format(extrap_kmax))
         print(':: (for points out of range, the returned value is the boundary value)')
-        print(':: NOTE: integral over z from 0 will start from chi2z(ell/extrap_kmax)')
 
         if extrap_kmax is None:
             self.kmax = kmax
         else:
             self.kmax = extrap_kmax
 
-    def set_interp_chiz(self, zmin, zmax, dz):
-        check = np.amax(self.ells) / self.kmax / self.cosmo.z2chi(zmax)
-        print('-- check = {0:.2f}'.format(check))
-        if check > 1:
-            sys.exit('-- set_chi2z: zmax not large enough')
-
-        self.cosmo.gen_interp_chiz(zmin=zmin, zmax=zmax, dz=dz)
+        print('-- checking integral over z from zero')
+        print('- ell = {0:g} : z_zero = {1:g}'.format(
+            self.ells[0], self.cosmo.interp_chi2z(self.ells[0] / self.kmax)))
+        print('- ell = {0:g} : z_zero = {1:g}'.format(
+            self.ells[-1], self.cosmo.interp_chi2z(self.ells[-1] / self.kmax)))
 
     def set_interp_Tk(self, kmax):
         self.cosmo.gen_interp_Tk(kmax)
