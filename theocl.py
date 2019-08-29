@@ -94,7 +94,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0]
+                              epsabs=0, epsrel=1e-3)[0]
 
         print('>> Computing C_l^gg...')
         tt0 = time.time()
