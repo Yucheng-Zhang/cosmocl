@@ -71,8 +71,8 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
-                              epsabs=0, epsrel=1e-6)[0]
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
+                              epsabs=0, epsrel=1e-4)[0]
 
         print('>> Computing C_l^kg...')
         tt0 = time.time()
@@ -93,7 +93,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0]
 
         print('>> Computing C_l^gg...')
@@ -116,7 +116,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0]
 
         print('>> Computing C_l^mg...')
@@ -136,7 +136,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0]
 
         print('>> Computing Q_l^gg...')
@@ -159,7 +159,7 @@ class theocls:
 
         def target(ell):
             return spint.dblquad(kernel, self.z1, self.z2, lambda x: self.z1, lambda x: x,
-                                 args=(ell,), epsabs=0, epsrel=1e-6)[0]
+                                 args=(ell,), epsabs=0, epsrel=1e-3)[0]
 
         print('>> Computing C_l^g1g2...')
         tt0 = time.time()
@@ -187,7 +187,7 @@ class theocls:
             iz = self.cosmo.interp_chi2z(ell/self.kmax)
             return spint.tplquad(kernel, self.z1, self.z2, lambda x: self.z1, lambda x: self.z2,
                                  lambda x, y: iz, lambda x, y: min(x, y),
-                                 args=(ell,), epsabs=0, epsrel=1e-2)[0]
+                                 args=(ell,), epsabs=0, epsrel=1e-3)[0]
 
         print('>> Computing C_l^g2g2...')
         tt0 = time.time()
@@ -238,7 +238,7 @@ class theocls:
 
         def target(ell):
             iz = self.cosmo.interp_chi2z((ell+1./2.)/self.kmax)
-            return spint.quad(kernel, iz, Z_CMB, args=(ell,), full_output=1,
+            return spint.quad(kernel, iz, Z_CMB, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0]
 
         print('>> Computing C_l^kk...')
@@ -273,7 +273,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**2
 
         print('>> Computing C_l^kg,nl...')
@@ -298,7 +298,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
 
         print('>> Computing C_l^kg,RSD...')
@@ -322,7 +322,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**2
 
         print('>> Computing C_l^gg,0f...')
@@ -346,7 +346,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**4
 
         print('>> Computing C_l^gg,ff...')
@@ -370,7 +370,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
 
         print('>> Computing C_l^gg,0r...')
@@ -394,7 +394,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] * (ell+1./2.) * self.K_ell(ell)**2
 
         print('>> Computing C_l^gg,rr...')
@@ -418,7 +418,7 @@ class theocls:
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
-            return spint.quad(kernel, self.z1, self.z2, args=(ell,), full_output=1,
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
                               epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) / np.power(ell+1./2., 3./2.)
 
         print('>> Computing C_l^gg,fr...')
