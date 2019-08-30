@@ -38,7 +38,8 @@ class theocls:
         print(':: kmax = {0:g}'.format(kmax))
         if extrap_kmax is not None:
             print(':: extrap_kmax = {0:g}'.format(extrap_kmax))
-        print(':: (for points out of range, the returned value is the boundary value)')
+        print(
+            ':: (note: for points out of range, the returned value is the boundary value)')
 
         if extrap_kmax is None:
             self.kmax = kmax
@@ -50,12 +51,6 @@ class theocls:
             self.ells[0], self.cosmo.interp_chi2z(self.ells[0] / self.kmax)))
         print('- ell = {0:g} : z_zero = {1:g}'.format(
             self.ells[-1], self.cosmo.interp_chi2z(self.ells[-1] / self.kmax)))
-
-    def set_interp_Tk(self, kmax):
-        self.cosmo.gen_interp_Tk(kmax)
-
-    def set_interp_D_z(self, zmin, zmax, dz):
-        self.cosmo.gen_interp_D_z(zmin=zmin, zmax=zmax, dz=dz)
 
     def get_ells(self):
         return self.ells
@@ -120,11 +115,13 @@ class theocls:
                               epsabs=0, epsrel=1e-6)[0]
 
         print('>> Computing C_l^mg...')
+        tt0 = time.time()
         cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
                                             for ell in self.ells)
 
         cl = np.array(cl) / C_LIGHT
 
+        print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
         return cl
 
     def c_qlgg(self):
@@ -137,14 +134,16 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0]
+                              epsabs=0, epsrel=1e-4)[0]
 
         print('>> Computing Q_l^gg...')
+        tt0 = time.time()
         cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
                                             for ell in self.ells)
 
         cl = np.array(cl) / 2.
 
+        print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
         return cl
 
     # ------ Magnification bias calibration ------ #
@@ -299,7 +298,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
+                              epsabs=0, epsrel=1e-4)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
 
         print('>> Computing C_l^kg,RSD...')
         tt0 = time.time()
@@ -371,7 +370,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
+                              epsabs=0, epsrel=1e-3)[0] * self.K_ell(ell) * np.sqrt(ell+1./2.)
 
         print('>> Computing C_l^gg,0r...')
         tt0 = time.time()
@@ -395,7 +394,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] * (ell+1./2.) * self.K_ell(ell)**2
+                              epsabs=0, epsrel=1e-3)[0] * (ell+1./2.) * self.K_ell(ell)**2
 
         print('>> Computing C_l^gg,rr...')
         tt0 = time.time()
