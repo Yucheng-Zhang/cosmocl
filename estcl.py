@@ -1,85 +1,118 @@
 '''
-Estimate Cl.
+Estimation of Cl.
 '''
-import argparse
+import pymaster as nmt
+import numpy as np
+import healpy as hp
+import collections
 import sys
-from estnmt import main_master
-from esthp import main_hp
+import time
 
 
-if __name__ == "__main__":
+class estcl:
+    '''Estimation of Cl, w/ PyMaster or Healpy.'''
 
-    parser = argparse.ArgumentParser(description='Estimate Cl.')
+    def __init__(self):
 
-    parser.add_argument('-est', type=str, default='nmt',
-                        help='Estimator: nmt for NaMaster, \
-                            hp for simple estimation with healpy')
-    parser.add_argument('-tp', type=str, default='auto',
-                        help='auto or cross correlation.')
-    parser.add_argument('-fb', type=str, default='fb.dat',
-                        help='Data file which specifies the bins. \
-                            Two columns [lmin, lmax], closed on both sides.')
-    parser.add_argument('-eccl', type=str, default='00',
-                        help='Estimation of coupled C_l. \
-                            0: multiply mask on the map first, \
-                               which is default in PyMaster; \
-                            1: not multiply mask on the map;')
+        # maps and masks
+        self.fields = collections.OrderedDict()  # map & mask
+        self.nside = None
 
-    parser.add_argument('-nside', type=int, default=1024,
-                        help='Nside of the masks and maps.')
+        # bandpower settings
+        self.bps = collections.OrderedDict()
+        # bins, two columns [lmin, lmax], closed on both sides.
+        self.bps['bins'] = None
+        self.bps['ells'] = None
+        self.bps['ibpws'] = None  # index of bandpower for each ell
+        self.bps['weights'] = None  # weight of each cl over bin
 
-    parser.add_argument('-mask1', type=str, default='',
-                        help='Input mask file 1.')
-    parser.add_argument('-map1', type=str, default='',
-                        help='Input map file 1.')
-    parser.add_argument('-fwhm1', type=float, default=-1,
-                        help='Full Width Half Max of the Gaussian beam \
-                            [in degree] for emission map.')
-    parser.add_argument('-temp1', type=str, default='',
-                        help='Noise template 1.')
+        # power spectrum related
+        self.cls = collections.OrderedDict()
 
-    parser.add_argument('-mask2', type=str, default='',
-                        help='Input mask file 2.')
-    parser.add_argument('-map2', type=str, default='',
-                        help='Input map file 2.')
-    parser.add_argument('-fwhm2', type=float, default=-1,
-                        help='Full Width Half Max of the Gaussian beam \
-                            [in degree] for emission map.')
-    parser.add_argument('-temp2', type=str, default='',
-                        help='Noise template 2.')
+    def read_map(self, nside, fields, fmaps, fmasks):
+        '''Read maps and masks.'''
+        self.nside = nside
 
-    #--- output related ---#
-    parser.add_argument('-focl', type=str, default='out-cl.dat',
-                        help='Output ell,cl file name.')
+        for i, field in enumerate(fields):
+            print('>> Loading field: {0:s}'.format(field))
+            self.fields[field] = collections.OrderedDict()
+            print('> map {0:s}'.format(fmaps[i]))
+            self.fields[field]['map'] = hp.read_map(fmaps[i])
+            print('> mask {0:s}'.format(fmasks[i]))
+            self.fields[field]['mask'] = hp.read_map(fmasks[i])
+            # check nside
+            if hp.get_nside(self.fields[field]['map']) != nside or \
+                    hp.get_nside(self.fields[field]['mask']) != nside:
+                sys.exit('!! exit: nside does not match !!')
 
-    #--- for PyMaster estimation ---#
-    parser.add_argument('-savewsp', type=int, default=0,
-                        help='Save the workspace or not, which might be very large.')
-    parser.add_argument('-fwsp', type=str, default='',
-                        help='Workspace file name.')
-    parser.add_argument('-fcl', type=str, default='',
-                        help='Predicted Cl used to calculate gaussian covariance.')
-    parser.add_argument('-focov', type=str, default='output_cov.dat',
-                        help='Output covariance matrix file.')
+    def ini_bins(self, fb, weight_m=0):
+        '''Initialize bins.'''
+        # read the bins, two columns [lmin, lmax], closed on both sides
+        print('>> Loading bin file: {0:s}'.format(fb))
+        self.bps['bins'] = np.loadtxt(fb, dtype=np.int)
+        print('>> Bins initialized.')
+        # generate the bandpower index and weight of each Cl
+        ells = np.arange(self.bps['bins'][0, 0], self.bps['bins'][-1, -1] + 1,
+                         dtype=np.int)
+        self.bps['ells'] = ells
+        self.bps['ibpws'] = -1 + np.zeros_like(ells, dtype=np.int)
+        self.bps['weights'] = np.zeros_like(ells, dtype=np.float)
 
-    #--- for simple HealPy estimation ---#
-    parser.add_argument('-alm1', type=str, default='',
-                        help='Input alm file 1.')
-    parser.add_argument('-alm2', type=str, default='',
-                        help='Input alm file 2.')
-    parser.add_argument('-fsky', type=float, default=1.0,
-                        help='fsky if estimated with healpy.')
+        for i, bb in enumerate(self.bps['bins']):
+            idx = np.where((ells >= bb[0]) & (ells <= bb[1]))[0]
+            self.bps['ibpws'][idx] = i
+            if weight_m == 0:  # uniform
+                self.bps['weights'][idx] = 1. / idx.shape[0]
+            elif weight_m == 1:  # ell
+                self.bps['weights'][idx] = ells[idx] / np.sum(ells[idx])
+            elif weight_m == 2:  # ell*(ell+1)
+                w_ = ells[idx] * (1. + ells[idx])
+                self.bps['weights'][idx] = w_ / np.sum(w_)
+            else:
+                sys.exit('!! exit: wrong weight_m !!')
 
-    args = parser.parse_args()
+    def write_bins(self, fo='bins.dat'):
+        '''Output the bandpower bins information.'''
+        header = 'ell     bandpower     weight'
+        data = np.column_stack((self.bps['ells'], self.bps['ibpws'],
+                                self.bps['weights']))
+        fmt = '%5d   %5d   %15.7e'
+        np.savetxt(fo, data, header=header, fmt=fmt)
+        print(':: Bins written to: {0:s}'.format(fo))
 
+    def have_fld(self, fld):
+        '''Check if fld is in self.fields.'''
+        return fld in self.fields.keys()
 
-if __name__ == "__main__":
-    '''Main function.'''
-    if args.est == 'nmt':
-        main_master(args)
+    def est_nmt(self, f1, f2, cl_label):
+        '''Estimate w/ PyMaster, f1 & f2(f1) cross(auto) Cl..'''
+        print('>> Estimating with PyMaster...')
+        t0 = time.time()
+        # check f1 & f2
+        if not self.have_fld(f1) or not self.have_fld(f2):
+            sys.exit('!! exit: no such field !!')
 
-    elif args.est == 'hp':
-        main_hp(args)
+        b = nmt.NmtBin(self.nside, bpws=self.bps['ibpw'],
+                       ells=self.bps['ells'], weights=self.bps['weights'])
 
-    else:
-        sys.exit('Wrong estimator.')
+        fld1 = nmt.NmtField(self.fields[f1]['mask'],
+                            [self.fields[f1]['map']])
+        if f2 == f1:  # auto
+            fld2 = fld1
+        else:  # cross
+            fld2 = nmt.NmtField(self.fields[f2]['mask'],
+                                [self.fields[f2]['map']])
+
+        w = nmt.NmtWorkspace()
+        cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        cl_decoupled = w.decouple_cell(cl_coupled)[0]
+
+        self.cls[cl_label] = collections.OrderedDict()
+        self.cls[cl_label]['ell'] = b.get_effective_ells()
+        self.cls[cl_label]['cl'] = cl_decoupled
+
+        print('<< time elapsed: {0:.2} s'.format(time.time()-t0))
+
+    def est_hp(self):
+        '''Estimate w/ Healpy.'''
+        pass

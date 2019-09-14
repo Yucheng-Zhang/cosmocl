@@ -186,4 +186,8 @@ def main_master(args):
     else:
         clerr = np.array([0.] * len(cl))
 
+    # take care of constant shot noise
+    if args.shotnoise != 0:
+        cl = cl - args.shotnoise
+
     write_cls(ell, cl, clerr, args.focl, args.fb)
