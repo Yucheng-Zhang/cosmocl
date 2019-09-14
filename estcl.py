@@ -23,6 +23,8 @@ class estcl:
         # bins, two columns [lmin, lmax], closed on both sides.
         self.bps['bins'] = None
         self.bps['ells'] = None
+        self.bps['elle'] = None  # effective ell
+        self.bps['lerr'] = None  # ell err
         self.bps['ibpws'] = None  # index of bandpower for each ell
         self.bps['weights'] = None  # weight of each cl over bin
 
@@ -58,20 +60,27 @@ class estcl:
         self.bps['ibpws'] = -1 + np.zeros_like(ells, dtype=np.int)
         self.bps['weights'] = np.zeros_like(ells, dtype=np.float)
 
+        # set the effective ell at the mean ell
+        self.bps['elle'] = np.mean(self.bps['bins'], axis=1)
+        self.bps['lerr'] = (self.bps['bins'][:, 1] -
+                            self.bps['bins'][:, 0] + 1) / 2.
+
         for i, bb in enumerate(self.bps['bins']):
             idx = np.where((ells >= bb[0]) & (ells <= bb[1]))[0]
             self.bps['ibpws'][idx] = i
             if weight_m == 0:  # uniform
-                self.bps['weights'][idx] = 1. / idx.shape[0]
+                w_, w_e = 1., 1.
             elif weight_m == 1:  # ell
-                self.bps['weights'][idx] = ells[idx] / np.sum(ells[idx])
+                w_, w_e = ells[idx], self.bps['elle'][i]
             elif weight_m == 2:  # ell*(ell+1)
                 w_ = ells[idx] * (1. + ells[idx])
-                self.bps['weights'][idx] = w_ / np.sum(w_)
+                w_e = self.bps['elle'][i] * (self.bps['elle'][i] + 1)
             else:
                 sys.exit('!! exit: wrong weight_m !!')
 
-    def write_bins(self, fo='bins.dat'):
+            self.bps['weights'][idx] = w_ / w_e / idx.shape[0]
+
+    def write_bins(self, fo):
         '''Output the bandpower bins information.'''
         header = 'ell     bandpower     weight'
         data = np.column_stack((self.bps['ells'], self.bps['ibpws'],
@@ -84,15 +93,19 @@ class estcl:
         '''Check if fld is in self.fields.'''
         return fld in self.fields.keys()
 
+    def have_cl(self, cl):
+        '''Check if Cl is in self.cls.'''
+        return cl in self.cls.keys()
+
     def est_nmt(self, f1, f2, cl_label):
-        '''Estimate w/ PyMaster, f1 & f2(f1) cross(auto) Cl..'''
+        '''Estimate w/ PyMaster, f1 & f2(f1) cross(auto) Cl.'''
         print('>> Estimating with PyMaster...')
         t0 = time.time()
         # check f1 & f2
         if not self.have_fld(f1) or not self.have_fld(f2):
             sys.exit('!! exit: no such field !!')
 
-        b = nmt.NmtBin(self.nside, bpws=self.bps['ibpw'],
+        b = nmt.NmtBin(self.nside, bpws=self.bps['ibpws'],
                        ells=self.bps['ells'], weights=self.bps['weights'])
 
         fld1 = nmt.NmtField(self.fields[f1]['mask'],
@@ -104,15 +117,28 @@ class estcl:
                                 [self.fields[f2]['map']])
 
         w = nmt.NmtWorkspace()
+        print('> computing coupling matrix')
+        w.compute_coupling_matrix(fld1, fld2, b)
+        print('> computing coupled cl')
         cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
+        print('> decoupling cl')
         cl_decoupled = w.decouple_cell(cl_coupled)[0]
 
-        self.cls[cl_label] = collections.OrderedDict()
-        self.cls[cl_label]['ell'] = b.get_effective_ells()
-        self.cls[cl_label]['cl'] = cl_decoupled
+        self.cls[cl_label] = cl_decoupled
 
-        print('<< time elapsed: {0:.2} s'.format(time.time()-t0))
+        print('<< time elapsed: {0:.2f} s'.format(time.time()-t0))
 
     def est_hp(self):
-        '''Estimate w/ Healpy.'''
+        '''Estimate w/ Healpy, f1 & f2(f1) cross(auto) Cl.'''
         pass
+
+    def write_cl(self, fo, cl_label):
+        '''Write Cls to file.'''
+        if not self.have_cl(cl_label):
+            sys.exit('!! exit: no such cl : {0:s}'.format(cl_label))
+
+        header = 'ell   {0:s}   xerr'.format(cl_label)
+        fmt = '%g   %15.7e   %g'
+        data = np.column_stack((self.bps['elle'], self.cls[cl_label],
+                                self.bps['lerr']))
+        np.savetxt(fo, data, header=header, fmt=fmt)
