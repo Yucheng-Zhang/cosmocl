@@ -128,7 +128,7 @@ class estcl:
 
         print('<< time elapsed: {0:.2f} s'.format(time.time()-t0))
 
-    def est_hp(self):
+    def est_hp(self, f1, f2, cl_label):
         '''Estimate w/ Healpy, f1 & f2(f1) cross(auto) Cl.'''
         pass
 
@@ -137,8 +137,8 @@ class estcl:
         if not self.have_cl(cl_label):
             sys.exit('!! exit: no such cl : {0:s}'.format(cl_label))
 
-        header = 'ell   {0:s}   xerr'.format(cl_label)
-        fmt = '%g   %15.7e   %g'
+        header = 'ell     {0:s}     xerr'.format(cl_label)
+        fmt = '%10g   %.15e   %10g'
         data = np.column_stack((self.bps['elle'], self.cls[cl_label],
                                 self.bps['lerr']))
         np.savetxt(fo, data, header=header, fmt=fmt)
