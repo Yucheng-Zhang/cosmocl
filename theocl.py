@@ -153,7 +153,7 @@ class theocls:
             chi_z = self.cosmo.interp_z2chi(z)
             k = (ell + 1./2.) / chi_z
             p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
-                self.fg(z) / chi_z**2 * self.cosmo.f_growth_z(z)
+                self.fg(z) / chi_z**2  # * self.cosmo.f_growth_z(z)
             return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
