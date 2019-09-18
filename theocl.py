@@ -103,12 +103,35 @@ class theocls:
 
     # ------ C_Gamma calibration ------ #
 
+    def c_clm(self):
+        '''Compute C_l^m.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = self.cosmo.H_z(z) * self.fg(z)**2 / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
+                              epsabs=0, epsrel=1e-3)[0]
+
+        print('>> Computing C_l^m...')
+        tt0 = time.time()
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        cl = np.array(cl) / C_LIGHT
+
+        print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
+        return cl
+
     def c_clmg(self):
         '''Compute C_l^mg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
-            p1 = self.cosmo.H_z(z) * self.fg(z)**2 * self.b(z) / chi_z**2
-            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
+            k = (ell + 1./2.) / chi_z
+            p1 = self.cosmo.H_z(z) * self.b(z) * self.fg(z)**2 / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
@@ -124,13 +147,60 @@ class theocls:
         print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
         return cl
 
+    def c_qlm(self):
+        '''Compute Q_l^m.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
+                self.fg(z) / chi_z**2 * self.cosmo.f_growth_z(z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
+                              epsabs=0, epsrel=1e-4)[0]
+
+        print('>> Computing Q_l^m...')
+        tt0 = time.time()
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        cl = np.array(cl) / 2.
+
+        print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
+        return cl
+
+    def c_qlmg(self):
+        '''Compute Q_l^mg.'''
+        def kernel(z, ell):
+            chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
+            p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
+                self.fg(z) * self.b(z) / chi_z**2
+            return p1 * self.cosmo.interp_pk.P(z, k)
+
+        def target(ell):
+            return spint.quad(kernel, self.z1, self.z2, args=(ell,),
+                              epsabs=0, epsrel=1e-4)[0]
+
+        print('>> Computing Q_l^mg...')
+        tt0 = time.time()
+        cl = Parallel(n_jobs=self.num_cpus)(delayed(target)(ell)
+                                            for ell in self.ells)
+
+        cl = np.array(cl) / 2.
+
+        print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
+        return cl
+
     def c_qlgg(self):
         '''Compute Q_l^gg.'''
         def kernel(z, ell):
             chi_z = self.cosmo.interp_z2chi(z)
+            k = (ell + 1./2.) / chi_z
             p1 = (1 + z) * self.cosmo.interp_w_z(z) * \
                 self.fg(z) * self.b(z)**2 / chi_z**2
-            return p1 * self.cosmo.interp_pk.P(z, ell/chi_z)
+            return p1 * self.cosmo.interp_pk.P(z, k)
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
@@ -273,7 +343,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**2
+                              epsabs=0, epsrel=1e-4)[0] / (ell+1./2.)**2
 
         print('>> Computing C_l^kg,nl...')
         tt0 = time.time()
@@ -322,7 +392,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**2
+                              epsabs=0, epsrel=1e-3)[0] / (ell+1./2.)**2
 
         print('>> Computing C_l^gg,0f...')
         tt0 = time.time()
@@ -346,7 +416,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] / (ell+1./2.)**4
+                              epsabs=0, epsrel=1e-3)[0] / (ell+1./2.)**4
 
         print('>> Computing C_l^gg,ff...')
         tt0 = time.time()
@@ -418,7 +488,7 @@ class theocls:
 
         def target(ell):
             return spint.quad(kernel, self.z1, self.z2, args=(ell,),
-                              epsabs=0, epsrel=1e-6)[0] * self.K_ell(ell) / np.power(ell+1./2., 3./2.)
+                              epsabs=0, epsrel=1e-3)[0] * self.K_ell(ell) / np.power(ell+1./2., 3./2.)
 
         print('>> Computing C_l^gg,fr...')
         tt0 = time.time()
