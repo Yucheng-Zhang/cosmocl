@@ -97,9 +97,9 @@ class estcl:
         '''Check if Cl is in self.cls.'''
         return cl in self.cls.keys()
 
-    def est_nmt(self, f1, f2, cl_label):
+    def est_nmt(self, f1, f2, cl_label, re=False):
         '''Estimate w/ PyMaster, f1 & f2(f1) cross(auto) Cl.'''
-        print('>> Estimating with PyMaster...')
+        print('>> Estimating {0:s} with PyMaster...'.format(cl_label))
         t0 = time.time()
         # check f1 & f2
         if not self.have_fld(f1) or not self.have_fld(f2):
@@ -128,9 +128,22 @@ class estcl:
 
         print('<< time elapsed: {0:.2f} s'.format(time.time()-t0))
 
+        if re:  # return the Cl
+            return cl_decoupled
+
     def est_hp(self, f1, f2, cl_label):
         '''Estimate w/ Healpy, f1 & f2(f1) cross(auto) Cl.'''
         pass
+
+    def get_cl(self, cl_label):
+        '''Return the Cl.'''
+        if not self.have_cl(cl_label):
+            sys.exit('!! exit: no such cl : {0:s}'.format(cl_label))
+        return self.cls[cl_label]
+
+    def get_eff_ells(self):
+        '''Return the effective ells.'''
+        return self.bps['elle']
 
     def write_cl(self, fo, cl_label):
         '''Write Cls to file.'''
