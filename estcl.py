@@ -145,13 +145,17 @@ class estcl:
         '''Return the effective ells.'''
         return self.bps['elle']
 
+    def get_ell_width(self):
+        '''Return the bin width.'''
+        return self.bps['lerr']
+
     def write_cl(self, fo, cl_label):
         '''Write Cls to file.'''
         if not self.have_cl(cl_label):
             sys.exit('!! exit: no such cl : {0:s}'.format(cl_label))
 
         header = 'ell     {0:s}     xerr'.format(cl_label)
-        fmt = '%10g   %.15e   %10g'
+        fmt = '%10g   %23.15e   %10g'
         data = np.column_stack((self.bps['elle'], self.cls[cl_label],
                                 self.bps['lerr']))
         np.savetxt(fo, data, header=header, fmt=fmt)
