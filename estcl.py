@@ -12,11 +12,11 @@ import time
 class estcl:
     '''Estimation of Cl, w/ PyMaster or Healpy.'''
 
-    def __init__(self):
+    def __init__(self, nside):
 
         # maps and masks
         self.fields = collections.OrderedDict()  # map & mask
-        self.nside = None
+        self.nside = nside  # nside for all the maps and masks
 
         # bandpower settings
         self.bps = collections.OrderedDict()
@@ -31,9 +31,8 @@ class estcl:
         # power spectrum related
         self.cls = collections.OrderedDict()
 
-    def read_map(self, nside, fields, fmaps, fmasks):
+    def read_map(self, fields, fmaps, fmasks):
         '''Read maps and masks.'''
-        self.nside = nside
 
         for i, field in enumerate(fields):
             print('>> Loading field: {0:s}'.format(field))
@@ -43,8 +42,8 @@ class estcl:
             print('> mask {0:s}'.format(fmasks[i]))
             self.fields[field]['mask'] = hp.read_map(fmasks[i])
             # check nside
-            if hp.get_nside(self.fields[field]['map']) != nside or \
-                    hp.get_nside(self.fields[field]['mask']) != nside:
+            if hp.get_nside(self.fields[field]['map']) != self.nside or \
+                    hp.get_nside(self.fields[field]['mask']) != self.nside:
                 sys.exit('!! exit: nside does not match !!')
 
     def ini_bins(self, fb, weight_m=0):
@@ -128,12 +127,51 @@ class estcl:
 
         print('<< time elapsed: {0:.2f} s'.format(time.time()-t0))
 
-        if re:  # return the Cl
+        if re:
             return cl_decoupled
 
-    def est_hp(self, f1, f2, cl_label):
+    def est_hp(self, f1, f2, cl_label, apply_mask=True, re=False):
         '''Estimate w/ Healpy, f1 & f2(f1) cross(auto) Cl.'''
-        pass
+        print('>> Estimating {0:s} with Healpy...'.format(cl_label))
+        t0 = time.time()
+        # check f1 & f2
+        if not self.have_fld(f1) or not self.have_fld(f2):
+            sys.exit('!! exit: no such field !!')
+
+        auto = True if f1 == f2 else False  # auto or cross
+
+        # get fsky of overlapped mask
+        fsky = np.mean(self.fields[f1]['mask'] * self.fields[f2]['mask'])
+        print('> fsky = {0:f}'.format(fsky))
+
+        if apply_mask:  # explicitly apply mask on the map
+            map1 = self.fields[f1]['mask'] * self.fields[f1]['map']
+            if not auto:
+                map2 = self.fields[f2]['mask'] * self.fields[f2]['map']
+        else:
+            map1 = self.fields[f1]['map']
+            if not auto:
+                map2 = self.fields[f2]['map']
+
+        lmin, lmax = self.bps['ells'][0], self.bps['ells'][-1]
+        if auto:
+            cl = hp.anafast(map1, lmax=lmax)[lmin:] / fsky
+        else:
+            cl = hp.anafast(map1, map2, lmax=lmax)[lmin:] / fsky
+
+        # binning
+        nbins = self.bps['bins'].shape[0]
+        cl_b = np.zeros(nbins)
+        for i in range(nbins):
+            idx = self.bps['ibpws'] == i
+            cl_b[i] = np.sum(self.bps['weights'][idx] * cl[idx])
+
+        self.cls[cl_label] = cl_b
+
+        print('<< time elapsed: {0:.2f} s'.format(time.time()-t0))
+
+        if re:
+            return cl_b
 
     def get_cl(self, cl_label):
         '''Return the Cl.'''
