@@ -12,11 +12,13 @@ import time
 class estcl:
     '''Estimation of Cl, w/ PyMaster or Healpy.'''
 
-    def __init__(self, nside):
+    def __init__(self, nside, fields):
 
         # maps and masks
         self.fields = collections.OrderedDict()  # map & mask
         self.nside = nside  # nside for all the maps and masks
+        for fld in fields:
+            self.fields[fld] = collections.OrderedDict()
 
         # bandpower settings
         self.bps = collections.OrderedDict()
@@ -31,19 +33,34 @@ class estcl:
         # power spectrum related
         self.cls = collections.OrderedDict()
 
-    def read_map(self, fields, fmaps, fmasks):
-        '''Read maps and masks.'''
+        # PyMaster workspace
+        self.wsps = collections.OrderedDict()  # only depends on the mask
+
+    def add_field(self, fields):
+        '''Add fields.'''
+        for fld in fields:
+            self.fields[fld] = collections.OrderedDict()
+
+    def read_map(self, fields, fmaps):
+        '''Read maps for fields.'''
 
         for i, field in enumerate(fields):
-            print('>> Loading field: {0:s}'.format(field))
-            self.fields[field] = collections.OrderedDict()
+            print('>> field: {0:s}'.format(field))
             print('> map {0:s}'.format(fmaps[i]))
             self.fields[field]['map'] = hp.read_map(fmaps[i])
+            # check nside
+            if hp.get_nside(self.fields[field]['map']) != self.nside:
+                sys.exit('!! exit: nside does not match !!')
+
+    def read_mask(self, fields, fmasks):
+        '''Read masks for fields.'''
+
+        for i, field in enumerate(fields):
+            print('>> field: {0:s}'.format(field))
             print('> mask {0:s}'.format(fmasks[i]))
             self.fields[field]['mask'] = hp.read_map(fmasks[i])
             # check nside
-            if hp.get_nside(self.fields[field]['map']) != self.nside or \
-                    hp.get_nside(self.fields[field]['mask']) != self.nside:
+            if hp.get_nside(self.fields[field]['mask']) != self.nside:
                 sys.exit('!! exit: nside does not match !!')
 
     def ini_bins(self, fb, weight_m=0):
@@ -88,15 +105,19 @@ class estcl:
         np.savetxt(fo, data, header=header, fmt=fmt)
         print(':: Bins written to: {0:s}'.format(fo))
 
-    def have_fld(self, fld):
-        '''Check if fld is in self.fields.'''
-        return fld in self.fields.keys()
-
     def have_cl(self, cl):
         '''Check if Cl is in self.cls.'''
         return cl in self.cls.keys()
 
-    def est_nmt(self, f1, f2, cl_label, re=False):
+    def have_fld(self, fld):
+        '''Check if fld is in self.fields.'''
+        return fld in self.fields.keys()
+
+    def have_wsp(self, wsp):
+        '''Check if wsp is in self.wsps.'''
+        return wsp in self.wsps.keys()
+
+    def est_nmt(self, f1, f2, cl_label, re=False, save_wsp=False, rc_wsp=True):
         '''Estimate w/ PyMaster, f1 & f2(f1) cross(auto) Cl.'''
         print('>> Estimating {0:s} with PyMaster...'.format(cl_label))
         t0 = time.time()
@@ -115,9 +136,15 @@ class estcl:
             fld2 = nmt.NmtField(self.fields[f2]['mask'],
                                 [self.fields[f2]['map']])
 
-        w = nmt.NmtWorkspace()
-        print('> computing coupling matrix')
-        w.compute_coupling_matrix(fld1, fld2, b)
+        if rc_wsp or not self.have_wsp(f1+f2):
+            w = nmt.NmtWorkspace()
+            print('> computing coupling matrix')
+            w.compute_coupling_matrix(fld1, fld2, b)
+            if save_wsp:
+                self.wsps[f1+f2] = w
+        else:  # if masks not changed
+            w = self.wsps[f1+f2]
+
         print('> computing coupled cl')
         cl_coupled = nmt.compute_coupled_cell(fld1, fld2)
         print('> decoupling cl')
