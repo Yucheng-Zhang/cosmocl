@@ -6,7 +6,7 @@ import healpy as hp
 from cosmoknife.utils import get_ra_dec
 
 
-def gen_fb(lmin, lmax, nb, fo, scale=None):
+def gen_fb(lmin, lmax, nb, fo, scale=None, re=False):
     '''Generate band power bin file.'''
     if scale == 'log':
         b1 = np.logspace(np.log10(lmin), np.log10(lmax),
@@ -19,6 +19,23 @@ def gen_fb(lmin, lmax, nb, fo, scale=None):
 
     data = np.column_stack((b1[:-1], b2[1:]))
     np.savetxt(fo, data, fmt='%6d  %6d')
+
+    if re:
+        return data
+
+
+def bin_cl(cl, ell, bins, weight='uniform'):
+    '''Bin cl (one dim. array).'''
+    nb = bins.shape[0]
+    ell_b = np.mean(bins, axis=1)
+    ell_err = (bins[:, 1] - bins[:, 0] + 1) / 2.
+    cl_b = np.zeros(nb)
+    for i, be in enumerate(bins):
+        idx = np.where((ell >= be[0]) & (ell <= be[1]))[0]
+        if weight == 'uniform':
+            cl_b[i] = np.mean(cl[idx])
+
+    return cl_b, ell_b, ell_err
 
 
 def make_overdensity_map(nside, theta, phi, weight, mask, w_lim=0.9, powspec=False):
