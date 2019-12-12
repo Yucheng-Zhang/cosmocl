@@ -54,7 +54,7 @@ def make_overdensity_map(nside, theta, phi, weight, mask, w_lim=0.9, powspec=Fal
 
     # n-bar per steradians (for shot noise)
     area_pix = 4 * np.pi / npix
-    nbar_st = nbar / area_pix
+    # nbar_st = nbar / area_pix
 
     # get overdensity signal
     signal = np.zeros(npix)

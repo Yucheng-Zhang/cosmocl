@@ -47,7 +47,8 @@ class estcl:
         for i, field in enumerate(fields):
             print('>> field: {0:s}'.format(field))
             print('> map {0:s}'.format(fmaps[i]))
-            self.fields[field]['map'] = hp.read_map(fmaps[i])
+            self.fields[field]['map'] = hp.read_map(
+                fmaps[i], dtype=None).astype(np.float64)
             # check nside
             if hp.get_nside(self.fields[field]['map']) != self.nside:
                 sys.exit('!! exit: nside does not match !!')
@@ -58,17 +59,24 @@ class estcl:
         for i, field in enumerate(fields):
             print('>> field: {0:s}'.format(field))
             print('> mask {0:s}'.format(fmasks[i]))
-            self.fields[field]['mask'] = hp.read_map(fmasks[i])
+            self.fields[field]['mask'] = hp.read_map(
+                fmasks[i], dtype=None).astype(np.float64)
             # check nside
             if hp.get_nside(self.fields[field]['mask']) != self.nside:
                 sys.exit('!! exit: nside does not match !!')
 
-    def ini_bins(self, fb, weight_m=0):
+    def ini_bins(self, bins, weight_m=0):
         '''Initialize bins.'''
-        # read the bins, two columns [lmin, lmax], closed on both sides
-        print('>> Loading bin file: {0:s}'.format(fb))
-        self.bps['bins'] = np.loadtxt(fb, dtype=np.int)
+        if type(bins) == np.ndarray:
+            self.bps['bins'] = bins
+        elif type(bins) == str:
+            # read the bins, two columns [lmin, lmax], closed on both sides
+            print('>> Loading bin file: {0:s}'.format(bins))
+            self.bps['bins'] = np.loadtxt(bins, dtype=np.int)
+        else:
+            sys.exit('!! no bins or fb')
         print('>> Bins initialized.')
+
         # generate the bandpower index and weight of each Cl
         ells = np.arange(self.bps['bins'][0, 0], self.bps['bins'][-1, -1] + 1,
                          dtype=np.int)
@@ -206,12 +214,14 @@ class estcl:
             sys.exit('!! exit: no such cl : {0:s}'.format(cl_label))
         return self.cls[cl_label]
 
-    def get_eff_ells(self):
+    @property
+    def eff_ells(self):
         '''Return the effective ells.'''
         return self.bps['elle']
 
-    def get_ell_width(self):
-        '''Return the bin width.'''
+    @property
+    def bins_half_width(self):
+        '''Return the half bin width.'''
         return self.bps['lerr']
 
     def write_cl(self, fo, cl_label):
