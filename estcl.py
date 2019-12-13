@@ -29,6 +29,7 @@ class estcl:
         self.bps['lerr'] = None  # ell err
         self.bps['ibpws'] = None  # index of bandpower for each ell
         self.bps['weights'] = None  # weight of each cl over bin
+        self.bps['b'] = None  # pymaster bin file
 
         # power spectrum related
         self.cls = collections.OrderedDict()
@@ -65,7 +66,7 @@ class estcl:
             if hp.get_nside(self.fields[field]['mask']) != self.nside:
                 sys.exit('!! exit: nside does not match !!')
 
-    def ini_bins(self, bins, weight_m=0):
+    def ini_bins(self, bins, weight_m=0, cal_nmt_bin=True):
         '''Initialize bins.'''
         if type(bins) == np.ndarray:
             self.bps['bins'] = bins
@@ -104,6 +105,10 @@ class estcl:
 
             self.bps['weights'][idx] = w_ / w_e / idx.shape[0]
 
+        if cal_nmt_bin:
+            self.bps['b'] = nmt.NmtBin(self.nside, bpws=self.bps['ibpws'],
+                                       ells=self.bps['ells'], weights=self.bps['weights'])
+
     def write_bins(self, fo):
         '''Output the bandpower bins information.'''
         header = 'ell     bandpower     weight'
@@ -133,9 +138,6 @@ class estcl:
         if not self.have_fld(f1) or not self.have_fld(f2):
             sys.exit('!! exit: no such field !!')
 
-        b = nmt.NmtBin(self.nside, bpws=self.bps['ibpws'],
-                       ells=self.bps['ells'], weights=self.bps['weights'])
-
         fld1 = nmt.NmtField(self.fields[f1]['mask'],
                             [self.fields[f1]['map']])
         if f2 == f1:  # auto
@@ -147,7 +149,10 @@ class estcl:
         if rc_wsp or not self.have_wsp(f1+f2):
             w = nmt.NmtWorkspace()
             print('> computing coupling matrix')
-            w.compute_coupling_matrix(fld1, fld2, b)
+            if self.bps['b'] is None:
+                self.bps['b'] = nmt.NmtBin(self.nside, bpws=self.bps['ibpws'],
+                                           ells=self.bps['ells'], weights=self.bps['weights'])
+            w.compute_coupling_matrix(fld1, fld2, self.bps['b'])
             if save_wsp:
                 self.wsps[f1+f2] = w
         else:  # if masks not changed
