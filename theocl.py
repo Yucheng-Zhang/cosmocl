@@ -1,5 +1,6 @@
 '''
-Theoretical calculation of Cl.
+Theoretical computation of C_ell
+w/ Limber approximation.
 '''
 import numpy as np
 import scipy.integrate as spint
@@ -8,8 +9,6 @@ from joblib import Parallel, delayed
 import sys
 import time
 
-from cosmopy.cosmoLCDM import cosmoLCDM
-from cosmopy.utils import gen_fg_z
 
 C_LIGHT = 299792.458  # speed of light in km/s
 Z_CMB = 1100
