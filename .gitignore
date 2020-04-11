@@ -4,3 +4,5 @@ test.sh
 test.py
 *.pyc
 .vscode/
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
