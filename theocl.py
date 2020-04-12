@@ -503,7 +503,82 @@ class ccl_Limber:
 class ccl:
     '''Theoretical computation of cl w/ exact integration.'''
 
-    def __init__(self, ells, cosmo):
+    def __init__(self, cosmo):
+
+        self.cosmo = cosmo
+
+        self.ells = None
+
+        self.fg = None  # galaxy redshift distribution, f_g(z)
+        self.bg = None  # galaxy linear bias function, b_g(z)
+
+        self.chi_CMB = cosmo.z2chi(Z_CMB)
+
+        # k & chi sample points
+        self.ks, self.chis = None, None
+        self.kchis = None  # outer product of ks and chis
+        self.jls = None
+        self.bW_kappas = None
+        self.bW_gs = None
 
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
+
+    # ------ galaxy ------ #
+
+    def set_g(self, fg, bg):
+        '''Set galaxy survey related functions.'''
+        self.fg, self.bg = fg, bg
+
+    # ------ kernel functions ------ #
+
+    def bar_W_kappa(self, chi):
+        '''CMB lensing kernel: Bar{W}_kappa.'''
+        z = self.cosmo.interp_chi2z(chi)
+        fac = 3./2. * self.cosmo.Om0 * self.cosmo.H0**2 / C_LIGHT**2
+        return fac * (1+z) * chi * (1-chi/self.chi_CMB) * self.cosmo.interp_D_z(z)
+
+    def bar_W_g(self, chi):
+        '''galaxy kernel: Bar{W}_g.'''
+        z = self.cosmo.interp_chi2z(chi)
+        return self.cosmo.H_z(z)/C_LIGHT * self.cosmo.interp_D_z(z) * self.fg(z) * self.bg(z)
+
+    # ------ samples for integral ------ #
+
+    def set_kchi_samp(self, ks, chis, b_W_kappa=True, b_W_g=True):
+        '''Tabulate k & chi sample points.'''
+        self.ks, self.chis = ks, chis
+        self.kchis = np.outer(ks, chis)
+        if b_W_kappa:
+            self.bW_kappas = self.bar_W_kappa(chis)
+        if b_W_g and self.fg != None and self.bg != None:
+            self.bW_gs = self.bar_W_g(chis)
+
+    def set_ell(self, ells):
+        '''Set the ell's and j_ell's.'''
+        self.ells = ells
+        self.jls = np.array([spherical_jn(ell, self.kchis) for ell in ells])
+
+    # ------ transfer functions ------ #
+
+    def Delta_kappa(self):
+        '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
+        return np.einsum('k,ijk', self.bW_kappas, self.jls)
+
+    def Delta_g(self):
+        '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
+        return np.einsum('k,ijk', self.bW_gs, self.jls)
+
+    # ------ power spectra ------ #
+
+    def c_clkg(self):
+        '''Compute C_l^kg.'''
+        pass
+
+    def c_clkk(self):
+        '''Compute C_l^kk.'''
+        pass
+
+    def c_clgg(self):
+        '''Compute C_l^gg.'''
+        pass
