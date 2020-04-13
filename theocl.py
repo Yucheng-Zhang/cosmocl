@@ -508,8 +508,6 @@ class ccl:
 
         self.cosmo = cosmo
 
-        self.ells = None
-
         self.fg = None  # galaxy redshift distribution, f_g(z)
         self.bg = None  # galaxy linear bias function, b_g(z)
 
@@ -530,38 +528,46 @@ class ccl:
         self.Pk0 = None
         self.Pk0s = None
 
+        self.ells = None
+
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
 
-    # ------ galaxy ------ #
+    def init_all(self, fn_kchi=None, fn_jls=None,
+                 ks=None, chis=None, ells=None,
+                 fg=None, bg=None):
+        '''Simple interface that wraps up all the functions.'''
+        # load data file if provided
+        if fn_kchi != None and fn_jls != None:
+            f_samps = True
+            self.load_tabs(fn_kchi, fn_jls)
+        else:
+            f_samps = False
+
+        # set ks, chis, ells and jls if data file not provided
+        if not f_samps:
+            self.set_kchi_samp(ks, chis)
+            self.set_ell(ells)
+
+        # init matter power spectrum
+        self.set_Pk0()
+
+        # set galaxy functions
+        if fg != None and bg != None:
+            self.set_g(fg, bg)
+
+    # ------ galaxy functions ------ #
 
     def set_g(self, fg, bg):
         '''Set galaxy survey related functions.'''
         self.fg, self.bg = fg, bg
 
-    # ------ kernel functions ------ #
-
-    def bar_W_kappa(self, chi):
-        '''CMB lensing kernel: Bar{W}_kappa.'''
-        z = self.cosmo.interp_chi2z(chi)
-        fac = 3./2. * self.cosmo.Om0 * self.cosmo.H0**2 / C_LIGHT**2
-        return fac * (1+z) * chi * (1-chi/self.chi_CMB) * self.cosmo.interp_D_z(z)
-
-    def bar_W_g(self, chi):
-        '''galaxy kernel: Bar{W}_g.'''
-        z = self.cosmo.interp_chi2z(chi)
-        return self.cosmo.H_z(z)/C_LIGHT * self.cosmo.interp_D_z(z) * self.fg(z) * self.bg(z)
-
     # ------ samples for integral ------ #
 
-    def set_kchi_samp(self, ks, chis, b_W_kappa=True, b_W_g=True):
+    def set_kchi_samp(self, ks, chis):
         '''Tabulate k & chi sample points.'''
         self.ks, self.chis = ks, chis
         self.kchis = np.einsum('i,j->ij', ks, chis)
-        if b_W_kappa:
-            self.bW_kappas = self.bar_W_kappa(chis)
-        if b_W_g and self.fg != None and self.bg != None:
-            self.bW_gs = self.bar_W_g(chis)
 
     def set_ell(self, ells, fo=None):
         '''Set the ell's and j_ell's.'''
@@ -569,18 +575,46 @@ class ccl:
         # the following step of tabulating j_ell(kchi)
         # at (k,chi) sample points for each ell
         # can be time & memory consuming
+        # it's better to comp. & save the data in advance
         self.jls = np.array([spherical_jn(ell, self.kchis) for ell in ells])
         if fo != None:
             np.savez(fo, ells=ells, jls=self.jls)
+
+    def load_tabs(self, fn_kchi, fn_jls):
+        '''Load the k & chi sample points, and jl from file.'''
+        # k & chi samples
+        data = np.load(fn_kchi)
+        self.ks, self.chis = data['ks'], data['chis']
+        data.close()
+        # ells & jls
+        data = np.load(fn_jls)
+        self.ells, self.jls = data['ells'], data['jls']
+
+    # ------ kernel functions ------ #
+
+    def bar_W_kappa(self, chi):
+        '''CMB lensing kernel: Bar{W}_kappa(chi).'''
+        z = self.cosmo.interp_chi2z(chi)
+        fac = 3./2. * self.cosmo.Om0 * self.cosmo.H0**2 / C_LIGHT**2
+        return fac * (1+z) * chi * (1-chi/self.chi_CMB) * self.cosmo.interp_D_z(z)
+
+    def bar_W_g(self, chi):
+        '''galaxy kernel: Bar{W}_g(chi).'''
+        z = self.cosmo.interp_chi2z(chi)
+        return self.cosmo.H_z(z)/C_LIGHT * self.cosmo.interp_D_z(z) * self.fg(z) * self.bg(z)
 
     # ------ transfer functions ------ #
 
     def Delta_kappa(self):
         '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
+        if self.bW_kappas == None:
+            self.bW_kappas = self.bar_W_kappa(self.chis)
         return np.trapz(np.einsum('k,ijk->ijk', self.bW_kappas, self.jls), self.chis, axis=-1)
 
     def Delta_g(self):
         '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
+        if self.bW_gs == None:
+            self.bW_gs = self.bar_W_g(self.chis)
         return np.trapz(np.einsum('k,ijk->ijk', self.bW_gs, self.jls), self.chis, axis=-1)
 
     # ------ power spectra ------ #
