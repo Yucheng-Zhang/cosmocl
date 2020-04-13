@@ -5,6 +5,7 @@ import numpy as np
 from scipy import integrate
 from scipy import interpolate
 from scipy.special import spherical_jn
+import camb
 
 import multiprocessing as mp
 from joblib import Parallel, delayed
@@ -518,8 +519,16 @@ class ccl:
         self.ks, self.chis = None, None
         self.kchis = None  # outer product of ks and chis
         self.jls = None
+
+        # cache
         self.bW_kappas = None
         self.bW_gs = None
+        self.Delta_kappas = None
+        self.Delta_gs = None
+
+        # matter power spectrum at z=0
+        self.Pk0 = None
+        self.Pk0s = None
 
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
@@ -548,32 +557,64 @@ class ccl:
     def set_kchi_samp(self, ks, chis, b_W_kappa=True, b_W_g=True):
         '''Tabulate k & chi sample points.'''
         self.ks, self.chis = ks, chis
-        self.kchis = np.outer(ks, chis)
+        self.kchis = np.einsum('i,j->ij', ks, chis)
         if b_W_kappa:
             self.bW_kappas = self.bar_W_kappa(chis)
         if b_W_g and self.fg != None and self.bg != None:
             self.bW_gs = self.bar_W_g(chis)
 
-    def set_ell(self, ells):
+    def set_ell(self, ells, fo=None):
         '''Set the ell's and j_ell's.'''
         self.ells = ells
+        # the following step of tabulating j_ell(kchi)
+        # at (k,chi) sample points for each ell
+        # can be time & memory consuming
         self.jls = np.array([spherical_jn(ell, self.kchis) for ell in ells])
+        if fo != None:
+            np.savez(fo, ells=ells, jls=self.jls)
 
     # ------ transfer functions ------ #
 
     def Delta_kappa(self):
         '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
-        return np.einsum('k,ijk', self.bW_kappas, self.jls)
+        return np.trapz(np.einsum('k,ijk->ijk', self.bW_kappas, self.jls), self.chis, axis=-1)
 
     def Delta_g(self):
         '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
-        return np.einsum('k,ijk', self.bW_gs, self.jls)
+        return np.trapz(np.einsum('k,ijk->ijk', self.bW_gs, self.jls), self.chis, axis=-1)
 
     # ------ power spectra ------ #
 
+    def set_Pk0(self):
+        '''Set up the matter power spectrum.'''
+        pars = camb.CAMBparams()
+        pars.set_cosmology(H0=self.cosmo.H0, ombh2=self.cosmo.Ob0*self.cosmo.h**2,
+                           omch2=(self.cosmo.Om0-self.cosmo.Ob0)*self.cosmo.h**2, TCMB=self.cosmo.Tcmb0)
+        pars.InitPower.set_params(As=self.cosmo.As, ns=self.cosmo.ns)
+
+        pars.set_matter_power(redshifts=[0.], kmax=self.ks[-1])
+        pars.NonLinear = camb.model.NonLinear_both
+        results = camb.get_results(pars)
+        kh, _z, Pk = results.get_matter_power_spectrum(minkh=self.ks[1]/self.cosmo.h,
+                                                       maxkh=self.ks[-1]/self.cosmo.h, npoints=200)
+        ks = kh * self.cosmo.h
+        Pk0s = Pk[0]
+
+        # interpolate
+        self.Pk0 = interpolate.interp1d(ks, Pk0s, kind='quadratic',
+                                        bounds_error=False, fill_value='extrapolate')
+        # samples
+        self.Pk0s = self.Pk0(self.ks)
+
     def c_clkg(self):
         '''Compute C_l^kg.'''
-        pass
+        if self.Delta_kappas == None:
+            self.Delta_kappas = self.Delta_kappa()
+        if self.Delta_gs == None:
+            self.Delta_gs = self.Delta_g()
+
+        Deltas = self.Delta_kappas * self.Delta_gs
+        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
 
     def c_clkk(self):
         '''Compute C_l^kk.'''
