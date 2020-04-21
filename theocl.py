@@ -607,13 +607,13 @@ class ccl:
 
     def Delta_kappa(self):
         '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
-        if self.bW_kappas == None:
+        if self.bW_kappas is None:
             self.bW_kappas = self.bar_W_kappa(self.chis)
         return np.trapz(np.einsum('k,ijk->ijk', self.bW_kappas, self.jls), self.chis, axis=-1)
 
     def Delta_g(self):
         '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
-        if self.bW_gs == None:
+        if self.bW_gs is None:
             self.bW_gs = self.bar_W_g(self.chis)
         return np.trapz(np.einsum('k,ijk->ijk', self.bW_gs, self.jls), self.chis, axis=-1)
 
@@ -631,8 +631,10 @@ class ccl:
         results = camb.get_results(pars)
         kh, _z, Pk = results.get_matter_power_spectrum(minkh=self.ks[1]/self.cosmo.h,
                                                        maxkh=self.ks[-1]/self.cosmo.h, npoints=200)
+
+        # remove Hubble unit
         ks = kh * self.cosmo.h
-        Pk0s = Pk[0]
+        Pk0s = Pk[0] / self.cosmo.h**3
 
         # interpolate
         self.Pk0 = interpolate.interp1d(ks, Pk0s, kind='quadratic',
@@ -642,9 +644,9 @@ class ccl:
 
     def c_clkg(self):
         '''Compute C_l^kg.'''
-        if self.Delta_kappas == None:
+        if self.Delta_kappas is None:
             self.Delta_kappas = self.Delta_kappa()
-        if self.Delta_gs == None:
+        if self.Delta_gs is None:
             self.Delta_gs = self.Delta_g()
 
         Deltas = self.Delta_kappas * self.Delta_gs
@@ -652,8 +654,16 @@ class ccl:
 
     def c_clkk(self):
         '''Compute C_l^kk.'''
-        pass
+        if self.Delta_kappas is None:
+            self.Delta_kappas = self.Delta_kappa()
+
+        Deltas = self.Delta_kappas**2
+        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
 
     def c_clgg(self):
         '''Compute C_l^gg.'''
-        pass
+        if self.Delta_gs is None:
+            self.Delta_gs = self.Delta_g()
+
+        Deltas = self.Delta_gs**2
+        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
