@@ -567,7 +567,7 @@ class ccl:
     def set_kchi_samp(self, ks, chis):
         '''Tabulate k & chi sample points.'''
         self.ks, self.chis = ks, chis
-        self.kchis = np.einsum('i,j->ij', ks, chis)
+        self.kchis = np.einsum('k,c->kc', ks, chis)
 
     def set_ell(self, ells, fo=None):
         '''Set the ell's and j_ell's.'''
@@ -609,13 +609,13 @@ class ccl:
         '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
         if self.bW_kappas is None:
             self.bW_kappas = self.bar_W_kappa(self.chis)
-        return np.trapz(np.einsum('k,ijk->ijk', self.bW_kappas, self.jls), self.chis, axis=-1)
+        return np.trapz(np.einsum('c,lkc->lkc', self.bW_kappas, self.jls), self.chis, axis=-1)
 
     def Delta_g(self):
         '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
         if self.bW_gs is None:
             self.bW_gs = self.bar_W_g(self.chis)
-        return np.trapz(np.einsum('k,ijk->ijk', self.bW_gs, self.jls), self.chis, axis=-1)
+        return np.trapz(np.einsum('c,lkc->lkc', self.bW_gs, self.jls), self.chis, axis=-1)
 
     # ------ power spectra ------ #
 
@@ -650,7 +650,7 @@ class ccl:
             self.Delta_gs = self.Delta_g()
 
         Deltas = self.Delta_kappas * self.Delta_gs
-        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
+        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
 
     def c_clkk(self):
         '''Compute C_l^kk.'''
@@ -658,7 +658,7 @@ class ccl:
             self.Delta_kappas = self.Delta_kappa()
 
         Deltas = self.Delta_kappas**2
-        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
+        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
 
     def c_clgg(self):
         '''Compute C_l^gg.'''
@@ -666,4 +666,18 @@ class ccl:
             self.Delta_gs = self.Delta_g()
 
         Deltas = self.Delta_gs**2
-        return 2/np.pi * np.trapz(np.einsum('j,ij,j->ij', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
+        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
+
+    def c_clgg_ell(self, ell):
+        '''Compute C_l^gg at a given ell.'''
+        if ell in self.ells:
+            Deltas = self.Delta_gs[np.where(self.ells == ell)[0]]**2
+        else:
+            if self.kchis is None:
+                self.kchis = np.einsum('k,c->kc', self.ks, self.chis)
+            jls = spherical_jn(ell, self.kchis)
+            Delta_gs = np.trapz(
+                np.einsum('c,kc->kc', self.bW_gs, jls), self.chis, axis=-1)
+            Deltas = Delta_gs**2
+
+        return 2/np.pi * np.trapz(self.ks**2 * Deltas * self.Pk0s, self.ks, axis=-1)
