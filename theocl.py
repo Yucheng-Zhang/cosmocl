@@ -2,10 +2,8 @@
 Theoretical computation of C_ell.
 '''
 import numpy as np
-from scipy import integrate
-from scipy import interpolate
+from scipy import integrate, interpolate
 from scipy.special import spherical_jn
-import camb
 
 import multiprocessing as mp
 from joblib import Parallel, delayed
@@ -13,6 +11,173 @@ import sys
 import time
 
 from .constants import *
+
+
+class ccl:
+    '''Theoretical computation of cl w/ exact integration.'''
+
+    def __init__(self, cosmo):
+
+        self.cosmo = cosmo  # cosmopy.cosmology.flatLCDM instance
+
+        self.fg = None  # galaxy redshift distribution, f_g(z)
+        self.bg = None  # galaxy linear bias function, b_g(z)
+
+        self.chi_CMB = cosmo.chi(Z_CMB)
+
+        # k & chi sample points
+        self.ks, self.chis = None, None
+        self.kchis = None  # outer product of ks and chis
+        self.jls = None
+        self.zs = None  # z sample points corresponding to chis
+
+        # values at sample points
+        # window functions
+        self.bW_Xs = {'kappa': None, 'g': None}
+        # transfer functions
+        self.Delta_Xs = {'kappa': None, 'g': None, 'g_fNL': None}
+        # matter power spectrum at z=0
+        self.Pk0s = None
+        # for f_NL
+        self.betas = None
+
+        self.ells = None
+
+        self.num_cpus = mp.cpu_count()
+        print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
+
+    def init_all(self, fn_kchi=None, fn_jls=None,
+                 ks=None, chis=None, ells=None,
+                 fg=None, bg=None):
+        '''Simple interface that wraps up all the functions.'''
+        # load sample file if provided
+        if fn_kchi != None and fn_jls != None:
+            f_samps = True
+            self.load_tabs(fn_kchi, fn_jls)
+        else:
+            f_samps = False
+
+        print('chi_CMB with cosmo : {:.1f} Mpc'.format(self.chi_CMB))
+        # set ks, chis, ells and jls if data file not provided
+        if not f_samps:
+            self.set_kchi_samp(ks, chis)
+            self.set_ell(ells)
+
+        self.zs = self.cosmo.z_at_chi(self.chis)
+
+        # init matter power spectrum
+        self.Pk0s = self.cosmo.Pk(self.ks)
+
+        # set galaxy functions
+        if fg != None and bg != None:
+            self.set_g(fg, bg)
+
+    # ------ galaxy functions ------ #
+
+    def set_g(self, fg, bg):
+        '''Set galaxy survey related functions.'''
+        self.fg, self.bg = fg, bg
+
+    # ------ samples for integral ------ #
+
+    def set_kchi_samp(self, ks, chis):
+        '''Tabulate k & chi sample points.'''
+        self.ks, self.chis = ks, chis
+        self.kchis = np.einsum('k,c->kc', ks, chis)
+
+    def set_ell(self, ells, fo=None):
+        '''Set the ell's and j_ell's.'''
+        self.ells = ells
+        # the following step of tabulating j_ell(kchi)
+        # at (k,chi) sample points for each ell
+        # can be time & memory consuming
+        # it's better to comp. & save the data in advance
+        self.jls = np.array([spherical_jn(ell, self.kchis) for ell in ells])
+        if fo != None:
+            np.savez(fo, ells=ells, jls=self.jls)
+
+    def load_tabs(self, fn_kchi, fn_jls):
+        '''Load the k & chi sample points, and jl from file.'''
+        # k & chi samples
+        print('>> loading k & chi sample file: ' + fn_kchi)
+        data = np.load(fn_kchi)
+        self.ks, self.chis = data['ks'], data['chis']
+        data.close()
+        # check chi at CMB
+        print('chi max in the sample file : {:.1f} Mpc'.format(self.chis[-1]))
+        # ells & jls
+        print('>> loading corresponding j_ell sample file: ' + fn_jls)
+        data = np.load(fn_jls)
+        self.ells, self.jls = data['ells'], data['jls']
+
+    # ------ kernel functions ------ #
+
+    def c_bar_W(self, X):
+        '''Compute Bar{W}_X(chi) at all (chi) sample points.'''
+
+        if self.bW_Xs[X] is None:
+            if X is 'kappa':
+                fac = 3./2. * self.cosmo.Om0 * (self.cosmo.H0 / C_LIGHT)**2
+                self.bW_Xs['kappa'] = fac * (1 + self.zs) * self.chis * \
+                    (1 - self.chis / self.chi_CMB) * \
+                    self.cosmo.D(self.zs, interp=True)
+            if X is 'g':
+                self.bW_Xs['g'] = self.cosmo.H(self.zs)/C_LIGHT * self.fg(self.zs) * \
+                    self.bg(self.zs) * self.cosmo.D(self.zs, interp=True)
+
+    # ------ transfer functions ------ #
+
+    def c_Delta(self, X):
+        '''Compute Delta_{X, ell}(k) at all (ell, k) sample points.'''
+
+        if self.Delta_Xs[X] is None:
+            if X in ['kappa', 'g']:
+                self.c_bar_W(X)
+                self.Delta_Xs[X] = np.trapz(np.einsum('c,lkc->lkc', self.bW_Xs[X], self.jls),
+                                            self.chis, axis=-1)
+            if X is 'g_fNL':
+                self.c_beta()
+                self.Delta_Xs['g_fNL'] = np.trapz(np.einsum('c,kc,lkc->lkc',
+                                                            self.bW_Xs['g'], self.betas, self.jls),
+                                                  self.chis, axis=-1)
+
+    # ------ angular power spectra ------ #
+
+    def c_clxy(self, X, Y):
+        '''Compute C_l^XY.'''
+        for fld in [X, Y]:
+            self.c_Delta(fld)
+
+        Deltas = self.Delta_Xs[X] * self.Delta_Xs[Y]
+        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
+
+    def c_clxy_ell(self, X, Y, ell):
+        '''Compute C_l^XY at a given ell, assuming c_lxy has been called.'''
+        if ell in self.ells:
+            idx = np.where(self.ells == ell)[0]
+            Deltas = self.Delta_Xs[X][idx] * self.Delta_Xs[Y][idx]
+        else:
+            if self.kchis is None:
+                self.kchis = np.einsum('k,c->kc', self.ks, self.chis)
+            jls = spherical_jn(ell, self.kchis)
+            Delta_Xs_ = np.trapz(
+                np.einsum('c,kc->kc', self.bW_Xs[X], jls), self.chis, axis=-1)
+            Delta_Ys_ = np.trapz(
+                np.einsum('c,kc->kc', self.bW_Xs[Y], jls), self.chis, axis=-1)
+            Deltas = Delta_Xs_ * Delta_Ys_
+
+        return 2/np.pi * np.trapz(self.ks**2 * Deltas * self.Pk0s, self.ks, axis=-1)
+
+    # ------ f_NL related ------ #
+
+    def c_beta(self):
+        '''Compute beta(k, z) at all (k, chi) sample points.'''
+        if self.betas is None:
+            fac = 3 * self.cosmo.Om0 * DELTA_C * (self.cosmo.H0 / C_LIGHT)**2
+            fzs = (1 - 1 / self.bg(self.zs)) / \
+                self.cosmo.D(self.zs, interp=True)
+            fks = 1 / (self.ks**2 * self.cosmo.Tk(self.ks))
+            self.betas = fac * np.einsum('k,c->kc', fzs, fks)
 
 
 class ccl_Limber:
@@ -499,185 +664,3 @@ class ccl_Limber:
 
         print('>> Time elapsed: {0:.2f} s'.format(time.time() - tt0))
         return cl
-
-
-class ccl:
-    '''Theoretical computation of cl w/ exact integration.'''
-
-    def __init__(self, cosmo):
-
-        self.cosmo = cosmo
-
-        self.fg = None  # galaxy redshift distribution, f_g(z)
-        self.bg = None  # galaxy linear bias function, b_g(z)
-
-        self.chi_CMB = cosmo.z2chi(Z_CMB)
-
-        # k & chi sample points
-        self.ks, self.chis = None, None
-        self.kchis = None  # outer product of ks and chis
-        self.jls = None
-
-        # cache
-        self.bW_kappas = None
-        self.bW_gs = None
-        self.Delta_kappas = None
-        self.Delta_gs = None
-
-        # matter power spectrum at z=0
-        self.Pk0 = None
-        self.Pk0s = None
-
-        self.ells = None
-
-        self.num_cpus = mp.cpu_count()
-        print('>> Number of CPUs: {0:d}'.format(self.num_cpus))
-
-    def init_all(self, fn_kchi=None, fn_jls=None,
-                 ks=None, chis=None, ells=None,
-                 fg=None, bg=None):
-        '''Simple interface that wraps up all the functions.'''
-        # load data file if provided
-        if fn_kchi != None and fn_jls != None:
-            f_samps = True
-            self.load_tabs(fn_kchi, fn_jls)
-        else:
-            f_samps = False
-
-        # set ks, chis, ells and jls if data file not provided
-        if not f_samps:
-            self.set_kchi_samp(ks, chis)
-            self.set_ell(ells)
-
-        # init matter power spectrum
-        self.set_Pk0()
-
-        # set galaxy functions
-        if fg != None and bg != None:
-            self.set_g(fg, bg)
-
-    # ------ galaxy functions ------ #
-
-    def set_g(self, fg, bg):
-        '''Set galaxy survey related functions.'''
-        self.fg, self.bg = fg, bg
-
-    # ------ samples for integral ------ #
-
-    def set_kchi_samp(self, ks, chis):
-        '''Tabulate k & chi sample points.'''
-        self.ks, self.chis = ks, chis
-        self.kchis = np.einsum('k,c->kc', ks, chis)
-
-    def set_ell(self, ells, fo=None):
-        '''Set the ell's and j_ell's.'''
-        self.ells = ells
-        # the following step of tabulating j_ell(kchi)
-        # at (k,chi) sample points for each ell
-        # can be time & memory consuming
-        # it's better to comp. & save the data in advance
-        self.jls = np.array([spherical_jn(ell, self.kchis) for ell in ells])
-        if fo != None:
-            np.savez(fo, ells=ells, jls=self.jls)
-
-    def load_tabs(self, fn_kchi, fn_jls):
-        '''Load the k & chi sample points, and jl from file.'''
-        # k & chi samples
-        data = np.load(fn_kchi)
-        self.ks, self.chis = data['ks'], data['chis']
-        data.close()
-        # ells & jls
-        data = np.load(fn_jls)
-        self.ells, self.jls = data['ells'], data['jls']
-
-    # ------ kernel functions ------ #
-
-    def bar_W_kappa(self, chi):
-        '''CMB lensing kernel: Bar{W}_kappa(chi).'''
-        z = self.cosmo.interp_chi2z(chi)
-        fac = 3./2. * self.cosmo.Om0 * self.cosmo.H0**2 / C_LIGHT**2
-        return fac * (1+z) * chi * (1-chi/self.chi_CMB) * self.cosmo.interp_D_z(z)
-
-    def bar_W_g(self, chi):
-        '''galaxy kernel: Bar{W}_g(chi).'''
-        z = self.cosmo.interp_chi2z(chi)
-        return self.cosmo.H_z(z)/C_LIGHT * self.cosmo.interp_D_z(z) * self.fg(z) * self.bg(z)
-
-    # ------ transfer functions ------ #
-
-    def Delta_kappa(self):
-        '''Delta_{kappa, ell}(k) at all (ell, k) sample points.'''
-        if self.bW_kappas is None:
-            self.bW_kappas = self.bar_W_kappa(self.chis)
-        return np.trapz(np.einsum('c,lkc->lkc', self.bW_kappas, self.jls), self.chis, axis=-1)
-
-    def Delta_g(self):
-        '''Delta_{g, ell}(k) at all (ell, k) sample points.'''
-        if self.bW_gs is None:
-            self.bW_gs = self.bar_W_g(self.chis)
-        return np.trapz(np.einsum('c,lkc->lkc', self.bW_gs, self.jls), self.chis, axis=-1)
-
-    # ------ power spectra ------ #
-
-    def set_Pk0(self):
-        '''Set up the matter power spectrum.'''
-        pars = camb.CAMBparams()
-        pars.set_cosmology(H0=self.cosmo.H0, ombh2=self.cosmo.Ob0*self.cosmo.h**2,
-                           omch2=(self.cosmo.Om0-self.cosmo.Ob0)*self.cosmo.h**2, TCMB=self.cosmo.Tcmb0)
-        pars.InitPower.set_params(As=self.cosmo.As, ns=self.cosmo.ns)
-
-        pars.set_matter_power(redshifts=[0.], kmax=self.ks[-1])
-        pars.NonLinear = camb.model.NonLinear_both
-        results = camb.get_results(pars)
-        kh, _z, Pk = results.get_matter_power_spectrum(minkh=self.ks[1]/self.cosmo.h,
-                                                       maxkh=self.ks[-1]/self.cosmo.h, npoints=200)
-
-        # remove Hubble unit
-        ks = kh * self.cosmo.h
-        Pk0s = Pk[0] / self.cosmo.h**3
-
-        # interpolate
-        self.Pk0 = interpolate.interp1d(ks, Pk0s, kind='quadratic',
-                                        bounds_error=False, fill_value='extrapolate')
-        # samples
-        self.Pk0s = self.Pk0(self.ks)
-
-    def c_clkg(self):
-        '''Compute C_l^kg.'''
-        if self.Delta_kappas is None:
-            self.Delta_kappas = self.Delta_kappa()
-        if self.Delta_gs is None:
-            self.Delta_gs = self.Delta_g()
-
-        Deltas = self.Delta_kappas * self.Delta_gs
-        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
-
-    def c_clkk(self):
-        '''Compute C_l^kk.'''
-        if self.Delta_kappas is None:
-            self.Delta_kappas = self.Delta_kappa()
-
-        Deltas = self.Delta_kappas**2
-        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
-
-    def c_clgg(self):
-        '''Compute C_l^gg.'''
-        if self.Delta_gs is None:
-            self.Delta_gs = self.Delta_g()
-
-        Deltas = self.Delta_gs**2
-        return 2/np.pi * np.trapz(np.einsum('k,lk,k->lk', self.ks**2, Deltas, self.Pk0s), self.ks, axis=-1)
-
-    def c_clgg_ell(self, ell):
-        '''Compute C_l^gg at a given ell.'''
-        if ell in self.ells:
-            Deltas = self.Delta_gs[np.where(self.ells == ell)[0]]**2
-        else:
-            if self.kchis is None:
-                self.kchis = np.einsum('k,c->kc', self.ks, self.chis)
-            jls = spherical_jn(ell, self.kchis)
-            Delta_gs = np.trapz(
-                np.einsum('c,kc->kc', self.bW_gs, jls), self.chis, axis=-1)
-            Deltas = Delta_gs**2
-
-        return 2/np.pi * np.trapz(self.ks**2 * Deltas * self.Pk0s, self.ks, axis=-1)
