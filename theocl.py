@@ -12,6 +12,7 @@ import sys
 import time
 from tqdm import tqdm
 
+from .utils import jl_2nd
 from .constants import *
 
 
@@ -37,7 +38,7 @@ class ccl:
         # window functions
         self.bW_Xs = {'kappa': None, 'g': None}
         # transfer functions
-        self.Delta_Xs = {'kappa': {}, 'g': {}, 'g_NL': {}}
+        self.Delta_Xs = {'kappa': {}, 'g': {}, 'g_NL': {}, 'g_R': {}}
         # matter power spectrum at z=0
         self.Pk0s = self.cosmo.Pk(self.ks)
         # for f_NL
@@ -57,12 +58,22 @@ class ccl:
         self.num_cpus = mp.cpu_count()
         print('>> Number of CPUs: {:d}'.format(self.num_cpus))
 
-    def get_jls(self, ell):
+    def get_jls(self, ell, der=0):
         '''Get j_ell samples from data file or spherical_jn.'''
-        if ell in self.ell_ss:
-            return self.fss['j_{:d}'.format(ell)][:]
-        else:
-            return spherical_jn(ell, self.kchis)
+        if der == 0:
+            if ell in self.ell_ss:
+                return self.fss['j_{:d}'.format(ell)][:]
+            else:
+                return spherical_jn(ell, self.kchis)
+
+        if der == 2:
+            jls_ = {}
+            for i, ell_ in enumerate([ell-2, ell, ell+2]):
+                if ell_ in self.ell_ss:
+                    jls_[i] = self.fss['j_{:d}'.format(ell_)][:]
+                else:
+                    jls_[i] = spherical_jn(ell_, self.kchis)
+            return jl_2nd(ell, jls=jls_)
 
     # ------ kernel functions ------ #
 
@@ -79,6 +90,17 @@ class ccl:
             if X is 'g':
                 self.bW_Xs['g'] = self.cosmo.H(zs)/C_LIGHT * self.fg(zs) * \
                     self.bg(zs) * self.cosmo.D(zs, interp=True)
+
+    # ------ f_NL related ------ #
+
+    def c_beta(self):
+        '''Compute beta(k, z) at all (k, chi) sample points.'''
+        if self.betas is None:
+            fac = 3 * self.cosmo.Om0 * DELTA_C * (self.cosmo.H0 / C_LIGHT)**2
+            zs = self.zs[self.zms['g']]
+            fzs = (1 - 1 / self.bg(zs)) / self.cosmo.D_unnorm(zs, interp=True)
+            fks = 1 / (self.ks**2 * self.cosmo.Tk(self.ks))
+            self.betas = fac * np.einsum('k,c->kc', fks, fzs)
 
     # ------ transfer functions ------ #
 
@@ -101,22 +123,18 @@ class ccl:
                 self.Delta_Xs[X][ell] = np.trapz(np.einsum('c,kc,kc->kc', self.bW_Xs['g'],
                                                            self.betas, jls), chis, axis=-1)
 
-    # ------ f_NL related ------ #
-
-    def c_beta(self):
-        '''Compute beta(k, z) at all (k, chi) sample points.'''
-        if self.betas is None:
-            fac = 3 * self.cosmo.Om0 * DELTA_C * (self.cosmo.H0 / C_LIGHT)**2
-            zs = self.zs[self.zms['g']]
-            fzs = (1 - 1 / self.bg(zs)) / self.cosmo.D_unnorm(zs, interp=True)
-            fks = 1 / (self.ks**2 * self.cosmo.Tk(self.ks))
-            self.betas = fac * np.einsum('k,c->kc', fks, fzs)
+            if X is 'g_R':
+                self.c_bar_W('g')
+                jl_2nds = self.get_jls(ell, der=2)[:, self.zms['g']]
+                chis = self.chis[self.zms['g']]
+                self.Delta_Xs[X][ell] = - np.trapz(np.einsum('c,kc->kc', self.bW_Xs['g'], jl_2nds),
+                                                   chis, axis=-1)
 
     # ------ angular power spectra ------ #
 
     def c_clxy(self, X, Y, ells):
         '''Compute C_l^XY.'''
-        res = np.full_like(ells, 0.)
+        res = np.full_like(ells, 0., dtype=np.float)
 
         for i, ell in enumerate(tqdm(ells)):
             self.c_Delta(X, ell)
