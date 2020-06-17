@@ -43,3 +43,22 @@ def tab_jls(fn, ells, ks, chis, verbose=True):
         _dset = f.create_dataset('j_{:d}'.format(ell), data=jls)
 
     f.close()
+
+
+def shot_noise(num, area, n_ells=None):
+    '''Return the constant shot noise N_ell given 
+       the area [deg^2] and total number counts of the survey.'''
+    area_sr = (area / 41252.96) * 4 * np.pi
+    sn = 1. / (num / area_sr)
+    if n_ells is None:  # scalar
+        return sn
+    else:
+        return np.full(n_ells, sn)
+
+
+def cov_Gaussian(fsky, ells, cl13, cl24, cl14, cl23):
+    '''Gaussian covariances between cl12 and cl34,
+       cov(cl12, cl34) = (cl13 * cl24 + cl14 * cl23) / fsky / (2*l+1).
+       The noises should be included in the cl's.'''
+
+    return (cl13 * cl24 + cl14 * cl23) / fsky / (2 * ells + 1)

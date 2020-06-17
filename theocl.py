@@ -7,7 +7,7 @@ from scipy.special import spherical_jn
 import h5py
 
 import multiprocessing as mp
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 from .utils import jl_2nd
 from .constants import *
@@ -23,17 +23,22 @@ class cc:
         self.chi_CMB = cosmo.chi(Z_CMB)
 
         # ------ galaxy survey details ------
+        self.set_g(zg1, zg2, fg, bg)
+
+        # ------ with galaxy window function ------
+        self.g_set = ['g', 'g_NL', 'g_R', 'g_M']
+
+        # self.num_cpus = mp.cpu_count()
+        # print('>> Number of CPUs: {:d}'.format(self.num_cpus))
+
+    def set_g(self, zg1, zg2, fg, bg):
+        '''Set galaxy survey details.'''
         self.fg = fg  # galaxy redshift distribution, f_g(z)
         self.bg = bg  # galaxy linear bias function, b_g(z)
         self.zg1, self.zg2 = zg1, zg2  # redshift bin of the galaxy survey
-        self.chig1 = self.cosmo.chi(zg1)
-        self.chig2 = self.cosmo.chi(zg2)
-
-        # ------ Limber approximation related ------
-        self.g_set = ['g', 'g_NL', 'g_R', 'g_M']  # with galaxy window function
-
-        self.num_cpus = mp.cpu_count()
-        print('>> Number of CPUs: {:d}'.format(self.num_cpus))
+        if zg1 is not None and zg2 is not None:
+            self.chig1 = self.cosmo.chi(zg1)
+            self.chig2 = self.cosmo.chi(zg2)
 
     # ------ window functions ------
 
@@ -86,22 +91,24 @@ class cc:
             pass
 
 
-def c_clxy_limber(cc, X, Y, ells, limber_kmax):
-    '''Compute C_l^XY at ell with Limber approximation.'''
+def c_clxy_limber(cc, X, Y, ells, limber_kmax, nonlinear_Pk):
+    '''Compute C_l^XY at ells with Limber approximation.'''
     def integrand(k, ell):
-        return k**2 * cc.Delta_Limber(X, ell, k) * cc.Delta_Limber(Y, ell, k) * cc.cosmo.Pk(k)
+        return k**2 * cc.Delta_Limber(X, ell, k) * cc.Delta_Limber(Y, ell, k) * \
+            cc.cosmo.Pk(k, nl=nonlinear_Pk)
 
     def c_one(ell):
         # integral limits
         if X in cc.g_set or Y in cc.g_set:
             kmin = (ell + 0.5) / cc.chig2
-            kmax = min(limber_kmax, (ell + 0.5) / cc.chig1)
+            with np.errstate(divide='ignore'):
+                kmax = min(limber_kmax, (ell + 0.5) / cc.chig1)
         else:
             kmin = (ell + 0.5) / cc.chi_CMB
             kmax = limber_kmax
 
         return 2./np.pi * integrate.quad(integrand, kmin, kmax, args=(ell,),
-                                         epsabs=0, epsrel=1e-4)[0]
+                                         epsabs=0.0, epsrel=1e-4)[0]
 
     res = np.array([c_one(ell) for ell in ells])
 
@@ -111,7 +118,7 @@ def c_clxy_limber(cc, X, Y, ells, limber_kmax):
 class ccl:
     '''Theoretical computation of cl.'''
 
-    def __init__(self, cc, fn_jls):
+    def __init__(self, cc, fn_jls, nonlinear_Pk=True):
 
         self.cc = cc
 
@@ -132,7 +139,7 @@ class ccl:
         self.Delta_Xs = {'kappa': {}, 'g': {},
                          'g_NL': {}, 'g_R': {}, 'g_M': {}}
         # matter power spectrum at z=0
-        self.Pk0s = self.cc.cosmo.Pk(self.ks)
+        self.Pk0s = self.cc.cosmo.Pk(self.ks, nl=nonlinear_Pk)
         # for f_NL
         self.betas = None
 
@@ -140,7 +147,18 @@ class ccl:
         # redshift mask
         self.zms = {}
         self.zms['kappa'] = (self.zs <= Z_CMB)
+        if self.cc.zg1 is not None and self.cc.zg2 is not None:
+            self.zms['g'] = (self.zs >= self.cc.zg1) & (self.zs <= self.cc.zg2)
+
+    def update_g(self, zg1, zg2, fg, bg):
+        '''Update the details of the galaxy survey.'''
+        self.cc.set_g(zg1, zg2, fg, bg)
         self.zms['g'] = (self.zs >= self.cc.zg1) & (self.zs <= self.cc.zg2)
+        # clear cache
+        self.bW_Xs['g'] = None
+        for kk in self.cc.g_set:
+            self.Delta_Xs[kk] = {}
+        self.betas = None
 
     def get_jls(self, ell, der=0):
         '''Get j_ell samples from data file or spherical_jn.'''
@@ -217,13 +235,14 @@ class ccl:
         return 2/np.pi * np.trapz(self.ks**2 * Deltas * self.Pk0s,
                                   self.ks, axis=-1)
 
-    def c_clxy(self, X, Y, ells, progbar=True, use_Limber=False, Limber_kmax=5.):
+    def c_clxy(self, X, Y, ells, progbar=True, use_Limber=False, Limber_kmax=10., Limber_nonlinear_Pk=True):
         '''Compute C_l^XY.'''
         res = np.full_like(ells, 0., dtype=np.float)
 
         if use_Limber:  # using Limber approximation
             ells_ = tqdm(ells) if progbar else ells
-            res = c_clxy_limber(self.cc, X, Y, ells_, Limber_kmax)
+            res = c_clxy_limber(self.cc, X, Y, ells_,
+                                Limber_kmax, Limber_nonlinear_Pk)
         else:  # exact integration
             enum_ells = enumerate(tqdm(ells)) if progbar else enumerate(ells)
             for i, ell in enum_ells:
