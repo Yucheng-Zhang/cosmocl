@@ -56,9 +56,16 @@ def shot_noise(num, area, n_ells=None):
         return np.full(n_ells, sn)
 
 
-def cov_Gaussian(fsky, ells, cl13, cl24, cl14, cl23):
+def cov_Gaussian(fsky, ell, cl13, cl24, cl14, cl23):
     '''Gaussian covariances between cl12 and cl34,
        cov(cl12, cl34) = (cl13 * cl24 + cl14 * cl23) / fsky / (2*l+1).
        The noises should be included in the cl's.'''
 
-    return (cl13 * cl24 + cl14 * cl23) / fsky / (2 * ells + 1)
+    return (cl13 * cl24 + cl14 * cl23) / fsky / (2 * ell + 1)
+
+
+def limber_lmin(cosmo, z1, z2):
+    '''Estimate minimum ell for Limber approximation with chi/Delta(chi).'''
+    chi = cosmo.chi(max(z1, z2))
+    Delta_chi = abs(cosmo.chi(z2) - cosmo.chi(z1))
+    return chi / Delta_chi - 0.5
