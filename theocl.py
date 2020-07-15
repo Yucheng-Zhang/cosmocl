@@ -98,7 +98,7 @@ class ccl_limber:
         if X == 'g_M':
             pass
 
-    def c_clxy_limber(self, X, Y, ells, limber_kmax=10., nonlinear_Pk=True, int_m='quad'):
+    def c_clxy_limber(self, X, Y, ells, limber_kmax=10., nonlinear_Pk=False, int_m='quad'):
         '''Compute C_l^XY at ells with Limber approximation.'''
         def integrand(k, ell):
             return k**2 * self.Delta_Limber(X, ell, k) * self.Delta_Limber(Y, ell, k) * \
@@ -260,7 +260,7 @@ class ccl:
                                    self.ks, axis=-1)
 
     def c_clxy(self, X, Y, ells, progbar=False, use_Limber=False,
-               Limber_kmax=10., Limber_nonlinear_Pk=True, Limber_int='quad'):
+               Limber_kmax=10., Limber_nonlinear_Pk=False, Limber_int='quad'):
         '''Compute C_l^XY.'''
         res = np.full_like(ells, 0., dtype=np.float)
 

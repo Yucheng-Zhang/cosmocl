@@ -13,12 +13,15 @@
     - https://github.com/LSSTDESC/NaMaster
     - `conda install -c conda-forge namaster`
 
+---
 
-### Theoretical calculation
+## Theoretical calculation
 - source: `theocl.py`
+- See [this notebook](./demo/theo_cal.ipynb) for example calculations.
 
+---
 
-### Estimation
+## Estimation
 (need update)
 
 - source: `estcl.py`
