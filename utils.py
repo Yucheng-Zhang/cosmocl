@@ -22,19 +22,22 @@ def jl_2nd(ell, x=None, jls=None):
     return t1 - t2 + t3
 
 
-def tab_spherical_Bessel(fn, kind, ells, ks, chis, verbose=True):
+def tab_spherical_Bessel(fn, kind, ells, ks, rs, As=None, verbose=True):
     '''tabulate spherical Bessel function sample points into a hdf5 file.
-       kind = 1, 2 or 3 for 1st, 2nd kind or both.'''
+       kind = 1, 2 or 3 for 1st, 2nd kind or both.
+       As: the factor for linear combination of j_ell and y_ell (for shell limit).'''
     f = h5py.File(fn, 'a')
 
-    # write ks, chis & kchis
+    # write ks, rs & krs
     if verbose:
-        print('>> writing ks, chis, kchis and ells ...')
+        print('>> writing ks, rs, krs and ells ...')
     _dset = f.create_dataset('ks', data=ks)
-    _dset = f.create_dataset('chis', data=chis)
-    kchis = np.einsum('i,j->ij', ks, chis)
-    _dset = f.create_dataset('kchis', data=kchis)
+    _dset = f.create_dataset('rs', data=rs)
+    krs = np.einsum('i,j->ij', ks, rs)
+    _dset = f.create_dataset('krs', data=krs)
     _dset = f.create_dataset('ells', data=ells)
+    if As is not None:
+        _dset = f.create_dataset('As', data=As)
 
     # spherical Bessels
     ss = '>> tabulating:'
@@ -50,10 +53,10 @@ def tab_spherical_Bessel(fn, kind, ells, ks, chis, verbose=True):
         if verbose:
             print('>> ell = {:d}'.format(ell))
         if tjl:
-            fls = spherical_jn(ell, kchis)
+            fls = spherical_jn(ell, krs)
             _dset = f.create_dataset('j_{:d}'.format(ell), data=fls)
         if tyl:
-            fls = spherical_yn(ell, kchis)
+            fls = spherical_yn(ell, krs)
             _dset = f.create_dataset('y_{:d}'.format(ell), data=fls)
 
     f.close()
