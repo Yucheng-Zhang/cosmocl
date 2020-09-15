@@ -3,7 +3,7 @@ Some useful functions.
 '''
 import numpy as np
 import h5py
-from scipy.special import spherical_jn
+from scipy.special import spherical_jn, spherical_yn
 
 
 def jl_2nd(ell, x=None, jls=None):
@@ -22,8 +22,9 @@ def jl_2nd(ell, x=None, jls=None):
     return t1 - t2 + t3
 
 
-def tab_jls(fn, ells, ks, chis, verbose=True):
-    '''tabulate j_ell(kchi) sample points into a hdf5 file'''
+def tab_spherical_Bessel(fn, kind, ells, ks, chis, verbose=True):
+    '''tabulate spherical Bessel function sample points into a hdf5 file.
+       kind = 1, 2 or 3 for 1st, 2nd kind or both.'''
     f = h5py.File(fn, 'a')
 
     # write ks, chis & kchis
@@ -35,12 +36,25 @@ def tab_jls(fn, ells, ks, chis, verbose=True):
     _dset = f.create_dataset('kchis', data=kchis)
     _dset = f.create_dataset('ells', data=ells)
 
-    # jls
+    # spherical Bessels
+    ss = '>> tabulating:'
+    tjl, tyl = False, False
+    if kind in [1, 3]:
+        ss += ' j_ell'
+        tjl = True
+    if kind in [2, 3]:
+        ss += ' y_ell'
+        tyl = True
+    print(ss)
     for ell in ells:
         if verbose:
             print('>> ell = {:d}'.format(ell))
-        jls = spherical_jn(ell, kchis)
-        _dset = f.create_dataset('j_{:d}'.format(ell), data=jls)
+        if tjl:
+            fls = spherical_jn(ell, kchis)
+            _dset = f.create_dataset('j_{:d}'.format(ell), data=fls)
+        if tyl:
+            fls = spherical_yn(ell, kchis)
+            _dset = f.create_dataset('y_{:d}'.format(ell), data=fls)
 
     f.close()
 
