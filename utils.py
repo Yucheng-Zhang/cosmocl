@@ -22,6 +22,15 @@ def jl_2nd(ell, x=None, jls=None):
     return t1 - t2 + t3
 
 
+def grp2dic(grp):
+    '''Convert hdf5 group (with integer key) into python dictionary.'''
+    dic = {}
+    for (key, value) in grp.items():
+        dic[int(key)] = value[:]
+
+    return dic
+
+
 def tab_j_ell(fn, ells, ks, rs, verbose=True):
     '''Tabulate j_ell at (k, r) sample points into a hdf5 file.'''
     f = h5py.File(fn, 'a')
@@ -34,11 +43,12 @@ def tab_j_ell(fn, ells, ks, rs, verbose=True):
     _dset = f.create_dataset('krs', data=krs)
 
     # spherical Bessels
+    jl_grp = f.create_group('j')
     for ell in ells:
         if verbose:
             print('>> ell = {:d}'.format(ell))
         j_ells = spherical_jn(ell, krs)
-        _dset = f.create_dataset('j_{:d}s'.format(ell), data=j_ells)
+        _dset = jl_grp.create_dataset('{:d}'.format(ell), data=j_ells)
 
     f.close()
 
@@ -50,6 +60,7 @@ def tab_J_ell(fn, ells, k_lns, A_lns, rs, verbose=True):
     _dset = f.create_dataset('ells', data=ells)
     _dset = f.create_dataset('rs', data=rs)
 
+    Jl_grp = f.create_group('J')
     for ell in ells:
         if verbose:
             print('>> ell = {:d}'.format(ell))
@@ -59,7 +70,7 @@ def tab_J_ell(fn, ells, k_lns, A_lns, rs, verbose=True):
         j_ells = spherical_jn(ell, k_lnrs)
         y_ells = spherical_yn(ell, k_lnrs)
         J_ells = j_ells + np.einsum('k,kr->kr', A_lns[ell], y_ells)
-        _dset = f.create_dataset('J_{:d}s'.format(ell), data=J_ells)
+        _dset = Jl_grp.create_dataset('{:d}'.format(ell), data=J_ells)
 
     f.close()
 
