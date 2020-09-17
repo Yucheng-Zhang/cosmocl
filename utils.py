@@ -22,42 +22,44 @@ def jl_2nd(ell, x=None, jls=None):
     return t1 - t2 + t3
 
 
-def tab_spherical_Bessel(fn, kind, ells, ks, rs, As=None, verbose=True):
-    '''tabulate spherical Bessel function sample points into a hdf5 file.
-       kind = 1, 2 or 3 for 1st, 2nd kind or both.
-       As: the factor for linear combination of j_ell and y_ell (for shell limit).'''
+def tab_j_ell(fn, ells, ks, rs, verbose=True):
+    '''Tabulate j_ell at (k, r) sample points into a hdf5 file.'''
     f = h5py.File(fn, 'a')
 
     # write ks, rs & krs
-    if verbose:
-        print('>> writing ks, rs, krs and ells ...')
+    _dset = f.create_dataset('ells', data=ells)
     _dset = f.create_dataset('ks', data=ks)
     _dset = f.create_dataset('rs', data=rs)
-    krs = np.einsum('i,j->ij', ks, rs)
+    krs = np.einsum('k,r->kr', ks, rs)
     _dset = f.create_dataset('krs', data=krs)
-    _dset = f.create_dataset('ells', data=ells)
-    if As is not None:
-        _dset = f.create_dataset('As', data=As)
 
     # spherical Bessels
-    ss = '>> tabulating:'
-    tjl, tyl = False, False
-    if kind in [1, 3]:
-        ss += ' j_ell'
-        tjl = True
-    if kind in [2, 3]:
-        ss += ' y_ell'
-        tyl = True
-    print(ss)
     for ell in ells:
         if verbose:
             print('>> ell = {:d}'.format(ell))
-        if tjl:
-            fls = spherical_jn(ell, krs)
-            _dset = f.create_dataset('j_{:d}'.format(ell), data=fls)
-        if tyl:
-            fls = spherical_yn(ell, krs)
-            _dset = f.create_dataset('y_{:d}'.format(ell), data=fls)
+        j_ells = spherical_jn(ell, krs)
+        _dset = f.create_dataset('j_{:d}s'.format(ell), data=j_ells)
+
+    f.close()
+
+
+def tab_J_ell(fn, ells, k_lns, A_lns, rs, verbose=True):
+    '''Tabulate J_ell (shell radial eigenfunction) at (k_ln, r) sample points into a hdf5 file.'''
+    f = h5py.File(fn, 'a')
+
+    _dset = f.create_dataset('ells', data=ells)
+    _dset = f.create_dataset('rs', data=rs)
+
+    for ell in ells:
+        if verbose:
+            print('>> ell = {:d}'.format(ell))
+        _dset = f.create_dataset('k_{:d}ns'.format(ell), data=k_lns[ell])
+        k_lnrs = np.einsum('k,r->kr', k_lns[ell], rs)
+        _dset = f.create_dataset('k_{:d}nrs'.format(ell), data=k_lnrs)
+        j_ells = spherical_jn(ell, k_lnrs)
+        y_ells = spherical_yn(ell, k_lnrs)
+        J_ells = j_ells + np.einsum('k,kr->kr', A_lns[ell], y_ells)
+        _dset = f.create_dataset('J_{:d}s'.format(ell), data=J_ells)
 
     f.close()
 
