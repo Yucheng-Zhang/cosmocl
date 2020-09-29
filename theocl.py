@@ -2,7 +2,7 @@
 Theoretical computation of C_ell.
 '''
 import numpy as np
-from scipy import integrate, interpolate
+from scipy import integrate
 from scipy.special import spherical_jn
 import h5py
 
@@ -20,7 +20,7 @@ class cc:
 
         # ------ cosmology ------
         self.cosmo = cosmo
-        self.chi_CMB = cosmo.chi(Z_CMB)
+        self.r_CMB = cosmo.chi(Z_CMB)
 
         # ------ galaxy survey details ------
         self.set_g(zg1, zg2, fg, bg)
@@ -34,16 +34,16 @@ class cc:
         self.bg = bg  # galaxy linear bias function, b_g(z)
         self.zg1, self.zg2 = zg1, zg2  # redshift bin of the galaxy survey
         if zg1 is not None and zg2 is not None:
-            self.chig1 = self.cosmo.chi(zg1)
-            self.chig2 = self.cosmo.chi(zg2)
+            self.rg1 = self.cosmo.chi(zg1)
+            self.rg2 = self.cosmo.chi(zg2)
 
     # ------ window functions ------ #
 
-    def bar_W(self, X, chis, zs):
-        '''Bar{W}_X(chi) function of tracers.'''
+    def bar_W(self, X, rs, zs):
+        '''Bar{W}_X(r) function of tracers.'''
         if X == 'kappa':
             fac = 3./2. * self.cosmo.Om0 * (self.cosmo.H0 / C_LIGHT)**2
-            return fac * (1 + zs) * chis * (1 - chis / self.chi_CMB) * \
+            return fac * (1 + zs) * rs * (1 - rs / self.r_CMB) * \
                 self.cosmo.D(zs, interp=True)
         if X == 'g':
             return self.cosmo.H(zs)/C_LIGHT * self.fg(zs) * self.bg(zs) * \
@@ -62,7 +62,7 @@ class cc:
             return fac * fks * fzs
 
     def bar_W_g_R(self, zs):
-        '''Bar{W}_g^R(chi) function.'''
+        '''Bar{W}_g^R(r) function.'''
         return self.cosmo.H(zs)/C_LIGHT * self.fg(zs) * self.cosmo.f(zs) * \
             self.cosmo.D(zs, interp=True)
 
@@ -77,14 +77,14 @@ class ccl_limber:
         '''Compute Delta_{X, ell}(k) with Limber approximation.
            ell: scalar; k: scalar or array'''
 
-        chi_lk = (ell + 0.5) / k
-        z_lk = self.cc.cosmo.z_at_chi(chi_lk)
+        r_lk = (ell + 0.5) / k
+        z_lk = self.cc.cosmo.z_at_chi(r_lk)
 
         if X in ['kappa', 'g']:
-            return np.sqrt(np.pi/(2*ell+1)) * self.cc.bar_W(X, chi_lk, z_lk) / k
+            return np.sqrt(np.pi/(2*ell+1)) * self.cc.bar_W(X, r_lk, z_lk) / k
 
         if X == 'g_NL':
-            return np.sqrt(np.pi/(2*ell+1)) * self.cc.bar_W('g', chi_lk, z_lk) * self.cc.beta_NL(k, z_lk) / k
+            return np.sqrt(np.pi/(2*ell+1)) * self.cc.bar_W('g', r_lk, z_lk) * self.cc.beta_NL(k, z_lk) / k
 
         if X == 'g_R':
             t1 = ell * (ell-1) / (2*ell-1) / (2*ell+1) / np.sqrt(2*ell-3) * \
@@ -107,11 +107,11 @@ class ccl_limber:
         def c_one(ell):
             # integral limits
             if X in self.cc.g_set or Y in self.cc.g_set:
-                kmin = (ell + 0.5) / self.cc.chig2
+                kmin = (ell + 0.5) / self.cc.rg2
                 with np.errstate(divide='ignore'):
-                    kmax = min(limber_kmax, (ell + 0.5) / self.cc.chig1)
+                    kmax = min(limber_kmax, (ell + 0.5) / self.cc.rg1)
             else:
-                kmin = (ell + 0.5) / self.cc.chi_CMB
+                kmin = (ell + 0.5) / self.cc.r_CMB
                 kmax = limber_kmax
 
             if int_m == 'quad':
@@ -134,15 +134,15 @@ class ccl:
 
         self.cc = cc
 
-        # ------ k, chi & j_ell sample points ------
+        # ------ k, r & j_ell sample points ------
         self.fn_jls = fn_jls
         self.fss = h5py.File(fn_jls, 'r')
         self.ks = self.fss['ks'][:]
-        self.chis = self.fss['chis'][:]
-        self.kchis = self.fss['kchis'][:]  # outer product of ks and chis
+        self.rs = self.fss['rs'][:]
+        self.krs = self.fss['krs'][:]  # outer product of ks and rs
         self.ell_ss = self.fss['ells'][:]
-        # z sample points corresponding to chis
-        self.zs = self.cc.cosmo.z_at_chi(self.chis)
+        # z sample points corresponding to rs
+        self.zs = self.cc.cosmo.z_at_chi(self.rs)
 
         # ------ values at sample points ------
         # window functions
@@ -178,7 +178,7 @@ class ccl:
             if ell in self.ell_ss:
                 return self.fss['j_{:d}'.format(ell)][:]
             else:
-                return spherical_jn(ell, self.kchis)
+                return spherical_jn(ell, self.krs)
 
         if der == 2:
             jls_ = {}
@@ -186,17 +186,17 @@ class ccl:
                 if ell_ in self.ell_ss:
                     jls_[i] = self.fss['j_{:d}'.format(ell_)][:]
                 else:
-                    jls_[i] = spherical_jn(ell_, self.kchis)
+                    jls_[i] = spherical_jn(ell_, self.krs)
             return jl_2nd(ell, jls=jls_)
 
     # ------ window functions ------ #
 
     def c_bar_W(self, X):
-        '''Compute Bar{W}_X(chi) at chi sample points.'''
+        '''Compute Bar{W}_X(r) at r sample points.'''
         if self.bW_Xs[X] is None:
             zs = self.zs[self.zms[X]]
-            chis = self.chis[self.zms[X]]
-            self.bW_Xs[X] = self.cc.bar_W(X, chis, zs)
+            rs = self.rs[self.zms[X]]
+            self.bW_Xs[X] = self.cc.bar_W(X, rs, zs)
 
     # ------ transfer functions ------ #
 
@@ -208,46 +208,46 @@ class ccl:
             if X in ['kappa', 'g']:
                 self.c_bar_W(X)
                 jls = self.get_jls(ell)[:, self.zms[X]]
-                chis = self.chis[self.zms[X]]
+                rs = self.rs[self.zms[X]]
                 self.Delta_Xs[X][ell] = np.trapz(np.einsum('c,kc->kc', self.bW_Xs[X], jls),
-                                                 chis, axis=-1)
+                                                 rs, axis=-1)
             if X == 'g_NL':
                 self.c_bar_W('g')
-                zs, chis = self.zs[self.zms['g']], self.chis[self.zms['g']]
-                # compute beta_NL(k, z) at all (k, chi) sample points
+                zs, rs = self.zs[self.zms['g']], self.rs[self.zms['g']]
+                # compute beta_NL(k, z) at all (k, r) sample points
                 beta_NLs = self.cc.beta_NL(self.ks, zs, arr=True)
 
                 jls = self.get_jls(ell)[:, self.zms['g']]
                 self.Delta_Xs[X][ell] = np.trapz(np.einsum('c,kc,kc->kc', self.bW_Xs['g'],
-                                                           beta_NLs, jls), chis, axis=-1)
+                                                           beta_NLs, jls), rs, axis=-1)
 
             if X == 'g_R':
-                zs, chis = self.zs[self.zms['g']], self.chis[self.zms['g']]
-                # compute bar_W_g_R(z) at chi sample points
+                zs, rs = self.zs[self.zms['g']], self.rs[self.zms['g']]
+                # compute bar_W_g_R(z) at r sample points
                 bar_W_g_Rs = self.cc.bar_W_g_R(zs)
 
                 jl_2nds = self.get_jls(ell, der=2)[:, self.zms['g']]
                 self.Delta_Xs[X][ell] = - np.trapz(np.einsum('c,kc->kc', bar_W_g_Rs, jl_2nds),
-                                                   chis, axis=-1)
+                                                   rs, axis=-1)
 
             if X == 'g_M':
-                zs, chis = self.zs[self.zms['g']], self.chis[self.zms['g']]
-                # compute W_g,ell^M(k,chi) at (k, chi) sample points
-                W_glMs = np.zeros((len(self.ks), len(chis)), dtype=np.float)
+                zs, rs = self.zs[self.zms['g']], self.rs[self.zms['g']]
+                # compute W_g,ell^M(k,r) at (k, r) sample points
+                W_glMs = np.zeros((len(self.ks), len(rs)), dtype=np.float)
                 jls = self.get_jls(ell)
-                for i in range(len(chis)):
-                    chi = chis[i]
-                    idx = (self.chis <= chi)  # for integral over chi'
-                    zps, chips = self.zs[idx], self.chis[idx]
-                    integrand = (1. + zps) * chips * (1. - chis / chips) * \
+                for i in range(len(rs)):
+                    r = rs[i]
+                    idx = (self.rs <= r)  # for integral over r'
+                    zps, rps = self.zs[idx], self.rs[idx]
+                    integrand = (1. + zps) * rps * (1. - rs / rps) * \
                         self.cc.cosmo.D(zps, interp=True)
                     W_glMs[:, i] = np.trapz(np.einsum('c,kc->kc', integrand, jls[:, idx]),
-                                            chips, axis=-1)
+                                            rps, axis=-1)
                 W_glMs *= 3./2. * self.cc.cosmo.Om0 * \
                     (self.cc.cosmo.H0 / C_LIGHT)**2
 
-                self.Delta_Xs[X][ell] = np.trapz(np.einsum('c,kc', self.cc.fg(chis), W_glMs),
-                                                 chis, axis=-1)
+                self.Delta_Xs[X][ell] = np.trapz(np.einsum('c,kc', self.cc.fg(rs), W_glMs),
+                                                 rs, axis=-1)
 
     # ------ angular power spectra ------ #
 

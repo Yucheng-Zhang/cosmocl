@@ -40,7 +40,7 @@ def tab_j_ell(fn, ells, ks, rs, verbose=True):
     _dset = f.create_dataset('ks', data=ks)
     _dset = f.create_dataset('rs', data=rs)
     krs = np.einsum('k,r->kr', ks, rs)
-    _dset = f.create_dataset('krs', data=krs)
+    # _dset = f.create_dataset('krs', data=krs)
 
     # spherical Bessels
     jl_grp = f.create_group('j')
@@ -60,13 +60,13 @@ def tab_J_ell(fn, ells, k_lns, A_lns, rs, verbose=True):
     _dset = f.create_dataset('ells', data=ells)
     _dset = f.create_dataset('rs', data=rs)
 
+    kl_grp = f.create_group('k')
     Jl_grp = f.create_group('J')
     for ell in ells:
         if verbose:
             print('>> ell = {:d}'.format(ell))
-        _dset = f.create_dataset('k_{:d}ns'.format(ell), data=k_lns[ell])
+        _dset = kl_grp.create_dataset('{:d}'.format(ell), data=k_lns[ell])
         k_lnrs = np.einsum('k,r->kr', k_lns[ell], rs)
-        _dset = f.create_dataset('k_{:d}nrs'.format(ell), data=k_lnrs)
         j_ells = spherical_jn(ell, k_lnrs)
         y_ells = spherical_yn(ell, k_lnrs)
         J_ells = j_ells + np.einsum('k,kr->kr', A_lns[ell], y_ells)
